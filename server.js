@@ -4,6 +4,7 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const { GoogleGenAI } = require('@google/genai');
+const { v2: cloudinary } = require('cloudinary');
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
@@ -15,7 +16,19 @@ const GEMINI_API_KEY = (process.env.GEMINI_API_KEY || '').trim();
 const DEEPSEEK_API_KEY = (process.env.DEEPSEEK_API_KEY || '').trim();
 const DEEPSEEK_MODEL = (process.env.DEEPSEEK_MODEL || 'deepseek-chat').trim();
 const DEEPSEEK_BASE_URL = (process.env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com').replace(/\/+$/, '');
+const CLOUDINARY_CLOUD_NAME = (process.env.CLOUDINARY_CLOUD_NAME || '').trim();
+const CLOUDINARY_API_KEY = (process.env.CLOUDINARY_API_KEY || '').trim();
+const CLOUDINARY_API_SECRET = (process.env.CLOUDINARY_API_SECRET || '').trim();
+const CLOUDINARY_FOLDER = (process.env.CLOUDINARY_FOLDER || 'travel-diary').trim();
 const genAI = GEMINI_API_KEY ? new GoogleGenAI({ apiKey: GEMINI_API_KEY }) : null;
+const cloudinaryEnabled = Boolean(CLOUDINARY_CLOUD_NAME && CLOUDINARY_API_KEY && CLOUDINARY_API_SECRET);
+if (cloudinaryEnabled) {
+  cloudinary.config({
+    cloud_name: CLOUDINARY_CLOUD_NAME,
+    api_key: CLOUDINARY_API_KEY,
+    api_secret: CLOUDINARY_API_SECRET
+  });
+}
 const chatSessions = new Map(); // 会话存储 sessionId -> { chat, history, keywords }
 const SESSION_TTL = 15 * 60 * 1000; // 15分钟过期
 // 主模型 → 轻量降级 → Gemma 兜底（Gemma 3 支持图片理解，且免费额度独立）
@@ -80,10 +93,42 @@ async function callTextOnly(prompt) {
   return res.text || '';
 }
 
+function getPathExt(filePath) {
+  try {
+    if (/^https?:\/\//i.test(filePath)) {
+      const u = new URL(filePath);
+      return path.extname(u.pathname).toLowerCase();
+    }
+  } catch (e) {}
+  return path.extname(filePath).toLowerCase();
+}
+
 // 根据文件扩展名获取正确的 MIME 类型（支持 HEIC 等特殊格式）
 const MIME_MAP = {'.png':'image/png','.gif':'image/gif','.webp':'image/webp','.heic':'image/heic','.heif':'image/heif','.bmp':'image/bmp','.tiff':'image/tiff','.tif':'image/tiff'};
 function getMimeFromExt(filePath) {
-  return MIME_MAP[path.extname(filePath).toLowerCase()] || 'image/jpeg';
+  return MIME_MAP[getPathExt(filePath)] || 'image/jpeg';
+}
+
+async function loadImageBytes(imageRef) {
+  if (/^https?:\/\//i.test(imageRef)) {
+    const r = await fetch(imageRef);
+    if (!r.ok) throw new Error(`图片下载失败: ${r.status}`);
+    const arr = await r.arrayBuffer();
+    return { data: Buffer.from(arr), mime: getMimeFromExt(imageRef) };
+  }
+  const localRef = imageRef.startsWith('/') ? imageRef.slice(1) : imageRef;
+  const fullPath = path.join(__dirname, 'public', localRef);
+  if (!fs.existsSync(fullPath)) throw new Error('本地图片不存在');
+  return { data: fs.readFileSync(fullPath), mime: getMimeFromExt(fullPath) };
+}
+
+async function uploadFileToCloudinary(localFilePath) {
+  if (!cloudinaryEnabled) return '';
+  const uploaded = await cloudinary.uploader.upload(localFilePath, {
+    folder: CLOUDINARY_FOLDER,
+    resource_type: 'image'
+  });
+  return uploaded.secure_url || '';
 }
 
 // 从 AI 回复中移除泄露的 ","keywords":[...] 等 JSON 片段
@@ -105,12 +150,12 @@ async function scanPersonsInPhotos(imagePaths) {
 
   // 读取所有照片
   for (let i = 0; i < imagePaths.length; i++) {
-    const fPath = imagePaths[i].startsWith('/') ? imagePaths[i].slice(1) : imagePaths[i];
-    const fullPath = path.join(__dirname, 'public', fPath);
-    if (!fs.existsSync(fullPath)) continue;
-    const data = fs.readFileSync(fullPath);
-    const mime = getMimeFromExt(fullPath);
-    validPhotos.push({ idx: i, data, mime, path: imagePaths[i] });
+    try {
+      const { data, mime } = await loadImageBytes(imagePaths[i]);
+      validPhotos.push({ idx: i, data, mime, path: imagePaths[i] });
+    } catch (e) {
+      continue;
+    }
   }
   if (validPhotos.length === 0) return [];
 
@@ -190,12 +235,15 @@ const CHIBI_POSES = [
 async function generateSingleChibi(photoPath, personDescription, recordId, personIndex) {
   const MAX_RETRIES = 2;
 
-  const fPath = photoPath.startsWith('/') ? photoPath.slice(1) : photoPath;
-  const fullPath = path.join(__dirname, 'public', fPath);
-  if (!fs.existsSync(fullPath)) return null;
-
-  const photoData = fs.readFileSync(fullPath);
-  const photoMime = getMimeFromExt(fullPath);
+  let photoData;
+  let photoMime;
+  try {
+    const loaded = await loadImageBytes(photoPath);
+    photoData = loaded.data;
+    photoMime = loaded.mime;
+  } catch (e) {
+    return null;
+  }
 
   // 为每个角色选择不同的姿势
   const poseIdx = (personIndex - 1 + parseInt(recordId) % CHIBI_POSES.length) % CHIBI_POSES.length;
@@ -539,7 +587,7 @@ app.get('/api/geocode', async (req, res) => {
 
 // ========== 上传旅行记录图片（支持多图） ==========
 app.post('/api/upload', (req, res) => {
-  upload.array('images', 20)(req, res, (err) => {
+  upload.array('images', 20)(req, res, async (err) => {
     if (err) {
       if (err.code === 'LIMIT_FILE_SIZE') {
         return res.status(400).json({ error: '图片太大（单张最大30MB），请压缩后重试' });
@@ -547,7 +595,19 @@ app.post('/api/upload', (req, res) => {
       return res.status(400).json({ error: '上传失败：' + err.message });
     }
     if (!req.files || req.files.length === 0) return res.status(400).json({ error: '请选择图片' });
-    const paths = req.files.map(f => '/uploads/' + f.filename);
+    const paths = [];
+    for (const f of req.files) {
+      let finalPath = '/uploads/' + f.filename;
+      if (cloudinaryEnabled) {
+        try {
+          const cloudUrl = await uploadFileToCloudinary(f.path);
+          if (cloudUrl) finalPath = cloudUrl;
+        } catch (e) {
+          console.warn('[Cloudinary] 上传失败，回退本地路径:', (e.message || '').substring(0, 80));
+        }
+      }
+      paths.push(finalPath);
+    }
     res.json({ success: true, paths });
   });
 });
@@ -668,10 +728,10 @@ app.post('/api/records', async (req, res) => {
       (async () => {
         try {
           const firstPath = imagePaths[0].startsWith('/') ? imagePaths[0].slice(1) : imagePaths[0];
-          const fullPath = path.join(__dirname, 'public', firstPath);
-          if (fs.existsSync(fullPath)) {
-            const data = fs.readFileSync(fullPath);
-            const mime = getMimeFromExt(fullPath);
+          if (imagePaths[0]) {
+            const loaded = await loadImageBytes(imagePaths[0]);
+            const data = loaded.data;
+            const mime = loaded.mime;
             console.log('[Q版] 后台人物特征提取，图片:', firstPath);
             const charPrompt = `看这张照片。重要：如是纯风景（无人、只有景色/动物/建筑），必须返回{"characters":[]}。
 如有1-3个清晰可见的人物，为每人提取：1)上衣主色hex 2)下装主色hex 3)头发short|medium|long 4)发色hex如#3d2c1e 5)肤色hint:light|medium|warm。最多3人。
@@ -941,14 +1001,14 @@ app.post('/api/chat/start', async (req, res) => {
     const imageParts = [];
     if (imagePaths && imagePaths.length > 0) {
       for (const imgPath of imagePaths.slice(0, 3)) { // 最多发3张图片节省额度
-        const fullPath = path.join(__dirname, 'public', imgPath);
-        if (fs.existsSync(fullPath)) {
-          const data = fs.readFileSync(fullPath);
-          const mime = getMimeFromExt(fullPath);
+        try {
+          const loaded = await loadImageBytes(imgPath);
+          const data = loaded.data;
+          const mime = loaded.mime;
           imageParts.push({
             inlineData: { data: data.toString('base64'), mimeType: mime }
           });
-        }
+        } catch (e) {}
       }
     }
 
