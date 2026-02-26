@@ -637,6 +637,44 @@ app.get('/api/records', (req, res) => {
   }
 });
 
+// ========== 更新旅行记录图片（追加/删除） ==========
+app.patch('/api/records/:id/images', (req, res) => {
+  const { addPaths, removePath } = req.body || {};
+  try {
+    let db = { records: [] };
+    if (fs.existsSync(DB_PATH)) db = JSON.parse(fs.readFileSync(DB_PATH, 'utf-8'));
+    const rec = (db.records || []).find(r => r.id === req.params.id);
+    if (!rec) return res.status(404).json({ error: '记录不存在' });
+
+    let images = [];
+    if (Array.isArray(rec.imagePaths) && rec.imagePaths.length > 0) images = [...rec.imagePaths];
+    else if (rec.imagePath) images = [rec.imagePath];
+
+    if (Array.isArray(addPaths) && addPaths.length > 0) {
+      for (const p of addPaths) {
+        if (typeof p === 'string' && p.trim() && !images.includes(p)) images.push(p);
+      }
+    }
+
+    if (typeof removePath === 'string' && removePath.trim()) {
+      images = images.filter(p => p !== removePath);
+    }
+
+    if (images.length > 0) {
+      rec.imagePaths = images;
+      rec.imagePath = images[0];
+    } else {
+      rec.imagePaths = [];
+      delete rec.imagePath;
+    }
+
+    fs.writeFileSync(DB_PATH, JSON.stringify(db, null, 2));
+    res.json({ success: true, record: rec });
+  } catch (err) {
+    res.status(500).json({ error: '更新图片失败' });
+  }
+});
+
 // ========== 保存旅行记录（自动获取天气） ==========
 app.post('/api/records', async (req, res) => {
   const record = req.body;

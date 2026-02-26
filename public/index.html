@@ -202,10 +202,17 @@
             width:140px; flex-shrink:0;
             opacity:0; transform:translateY(40px) scale(0.8);
             transition: opacity 0.4s ease-out, transform 0.4s ease-out;
+            position: relative;
         }
         .polaroid.show { opacity:1; /* transform set by JS with rotation */ }
         .polaroid img { width:100%; height:100px; object-fit:cover; display:block; border-radius:1px; }
         .polaroid-label { font-size:9px; color:#888; text-align:center; margin-top:6px; font-family:'Times New Roman',serif; }
+        .polaroid-remove {
+            position:absolute; top:4px; right:4px; width:20px; height:20px; border:none; border-radius:50%;
+            background:rgba(0,0,0,0.6); color:#fff; font-size:14px; line-height:20px; cursor:pointer;
+            z-index:3; display:flex; align-items:center; justify-content:center; padding:0;
+        }
+        .polaroid-remove:hover { background:rgba(230,80,80,0.95); }
 
         /* 信封内文字样式 */
         .envelope-card .card-desc { font-size:15px; color:rgba(255,245,255,0.95); line-height:1.7; white-space:pre-wrap; text-shadow:0 1px 4px rgba(0,0,0,0.3); }
@@ -215,6 +222,8 @@
         .envelope-card .card-close:hover { color:#fff; }
         .envelope-card .card-continue-chat { padding:8px 16px; border:1px solid rgba(150,160,220,0.3); border-radius:6px; background:transparent; color:rgba(180,190,255,0.8); font-size:12px; cursor:pointer; transition:all 0.2s; }
         .envelope-card .card-continue-chat:hover { background:rgba(120,130,200,0.15); border-color:rgba(150,160,220,0.5); color:#bbc4ff; }
+        .envelope-card .card-add-photos { padding:8px 16px; border:1px solid rgba(130,200,180,0.35); border-radius:6px; background:transparent; color:rgba(170,230,210,0.9); font-size:12px; cursor:pointer; transition:all 0.2s; }
+        .envelope-card .card-add-photos:hover { background:rgba(70,160,130,0.15); border-color:rgba(130,220,190,0.6); color:#d7fff3; }
         .envelope-card .card-delete { padding:8px 16px; border:1px solid rgba(200,150,180,0.3); border-radius:6px; background:transparent; color:rgba(255,180,180,0.7); font-size:12px; cursor:pointer; display:inline-block; transition:all 0.2s; }
         .envelope-card .card-delete:hover { background:rgba(255,100,100,0.1); border-color:rgba(255,150,150,0.5); color:#faa; }
 
@@ -422,6 +431,7 @@
                     <div class="card-weather" id="detail-weather" style="display:none"></div>
                     <div class="card-meta" id="detail-meta"></div>
                     <div style="display:flex;gap:10px;align-items:center;margin-top:16px;">
+                        <button class="card-add-photos" id="detail-add-photos" style="display:none;">📷 继续上传照片</button>
                         <button class="card-continue-chat" id="btn-continue-chat" style="display:none;">💬 继续聊天</button>
                         <button class="card-delete" id="detail-delete">撤回此信箱</button>
                     </div>
@@ -664,6 +674,8 @@
             });
             // 查看完整对话按钮
             document.getElementById('btn-view-chat').addEventListener('click', showChatLog);
+            // 详情页追加上传照片
+            document.getElementById('detail-add-photos').addEventListener('click', onAddPhotosToRecord);
             // 继续聊天按钮
             document.getElementById('btn-continue-chat').addEventListener('click', onContinueChat);
             document.getElementById('chat-log-close').addEventListener('click', () => {
@@ -1819,6 +1831,7 @@
             const meta = document.getElementById('detail-meta');
             const weather = document.getElementById('detail-weather');
             const deleteBtn = document.getElementById('detail-delete');
+            const addPhotosBtn = document.getElementById('detail-add-photos');
             const card = overlay.querySelector('.envelope-card');
             const decoBody = overlay.querySelector('.envelope-deco-body');
             const decoFlap = overlay.querySelector('.envelope-deco-flap');
@@ -1849,6 +1862,16 @@
             // 清空宝丽来区域
             polaroidArea.innerHTML = '';
 
+            if (currentDetailType === 'record') {
+                addPhotosBtn.style.display = '';
+                addPhotosBtn._rec = rec;
+                addPhotosBtn._marker = markerSprite || null;
+            } else {
+                addPhotosBtn.style.display = 'none';
+                addPhotosBtn._rec = null;
+                addPhotosBtn._marker = null;
+            }
+
             // 填充文字/天气/元信息（优先显示AI总结，其次用户描述）
             desc.textContent = cleanAIText(rec.aiSummary || rec.description || '无文字记录');
             const geo = reverseGeocode(rec.lat, rec.lon);
@@ -1874,6 +1897,17 @@
                 const tx = (Math.random() - 0.5) * 10;
                 div.style.setProperty('--final-rotate', rotate + 'deg');
                 div.style.setProperty('--final-tx', tx + 'px');
+                if (currentDetailType === 'record') {
+                    const removeBtn = document.createElement('button');
+                    removeBtn.className = 'polaroid-remove';
+                    removeBtn.textContent = '×';
+                    removeBtn.title = '删除这张照片';
+                    removeBtn.addEventListener('click', async (e) => {
+                        e.stopPropagation();
+                        await removePhotoFromRecord(rec, markerSprite, src);
+                    });
+                    div.appendChild(removeBtn);
+                }
                 const img = document.createElement('img');
                 img.alt = `照片 ${i+1}`;
                 const isHeic = /\.(heic|heif)$/i.test(src);
@@ -2091,8 +2125,76 @@
             stopEnvelopeParticles();
             document.getElementById('keywords-float').innerHTML = '';
             document.getElementById('chat-log-modal').style.display = 'none';
+            const addPhotosBtn = document.getElementById('detail-add-photos');
+            addPhotosBtn._rec = null;
+            addPhotosBtn._marker = null;
             currentDetailGroup = null;
             currentDetailType = 'record';
+        }
+
+        async function removePhotoFromRecord(rec, markerSprite, imagePath) {
+            if (!rec || !rec.id || !imagePath) return;
+            if (!confirm('确定要删除这张照片吗？')) return;
+            try {
+                const r = await fetch('/api/records/' + rec.id + '/images', {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ removePath: imagePath })
+                });
+                const d = await r.json();
+                if (!d.success) {
+                    alert('删除照片失败：' + (d.error || '未知错误'));
+                    return;
+                }
+                const updated = d.record;
+                if (markerSprite && markerSprite.userData) markerSprite.userData.record = updated;
+                await showDetail(updated, markerSprite || currentDetailGroup, 'record');
+            } catch (e) {
+                alert('删除照片失败');
+            }
+        }
+
+        async function onAddPhotosToRecord() {
+            const btn = document.getElementById('detail-add-photos');
+            const rec = btn._rec;
+            const marker = btn._marker || currentDetailGroup;
+            if (!rec || !rec.id) { alert('记录信息缺失'); return; }
+
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = 'image/*';
+            input.multiple = true;
+            input.onchange = async () => {
+                if (!input.files || input.files.length === 0) return;
+                try {
+                    const fd = new FormData();
+                    for (let i = 0; i < input.files.length; i++) fd.append('images', input.files[i]);
+                    const uploadRes = await fetch('/api/upload', { method: 'POST', body: fd });
+                    const uploadData = await uploadRes.json();
+                    if (!uploadData.paths || uploadData.paths.length === 0) {
+                        alert('上传失败：' + (uploadData.error || '未返回图片路径'));
+                        return;
+                    }
+
+                    const patchRes = await fetch('/api/records/' + rec.id + '/images', {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ addPaths: uploadData.paths })
+                    });
+                    const patchData = await patchRes.json();
+                    if (!patchData.success) {
+                        alert('更新记录失败：' + (patchData.error || '未知错误'));
+                        return;
+                    }
+
+                    const updated = patchData.record;
+                    if (marker && marker.userData) marker.userData.record = updated;
+                    await showDetail(updated, marker || currentDetailGroup, 'record');
+                } catch (e) {
+                    alert('继续上传失败');
+                }
+            };
+            input.click();
         }
 
         // ==================== 撤回信箱/取消计划 ====================
