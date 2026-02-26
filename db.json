@@ -4,7 +4,7 @@
       "lat": 49.97742183041282,
       "lon": 19.848932063844472,
       "description": "11",
-      "imagePath": "/uploads/1770409646987-942060015.JPG",
+      "imagePath": "https://res.cloudinary.com/daqocsd8z/image/upload/v1772127967/travel-diary/i2wxx4ib2lc2r0xjwwua.jpg",
       "id": "1770409647059",
       "createdAt": "2026-02-06T20:27:27.059Z",
       "characterStyles": [
@@ -23,15 +23,15 @@
       "lon": 136.79164921865646,
       "description": "看看情况",
       "imagePaths": [
-        "/uploads/1770546374201-832131328.png",
-        "/uploads/1770546374218-892200008.png",
-        "/uploads/1770546374228-378689089.png",
-        "/uploads/1770546374231-580118306.png",
-        "/uploads/1770546374241-575910139.png",
-        "/uploads/1770546374247-829135278.png",
-        "/uploads/1770546374252-372386109.png",
-        "/uploads/1770546374260-993055756.png",
-        "/uploads/1770546374272-561028741.png"
+        "https://res.cloudinary.com/daqocsd8z/image/upload/v1772127970/travel-diary/sztkbz4kwnn5p2i2smwn.png",
+        "https://res.cloudinary.com/daqocsd8z/image/upload/v1772127972/travel-diary/ybjttwdxufnhxv8dhinf.png",
+        "https://res.cloudinary.com/daqocsd8z/image/upload/v1772127978/travel-diary/n37uj69i5ravjvj8ygoj.png",
+        "https://res.cloudinary.com/daqocsd8z/image/upload/v1772127989/travel-diary/xgpzx8kosrgrhqktysrz.png",
+        "https://res.cloudinary.com/daqocsd8z/image/upload/v1772127993/travel-diary/sdkujydfvmakddeww2bx.png",
+        "https://res.cloudinary.com/daqocsd8z/image/upload/v1772127997/travel-diary/zs6tx8hiotdera5fmydt.png",
+        "https://res.cloudinary.com/daqocsd8z/image/upload/v1772127999/travel-diary/fiih56netpdfktjtbcui.png",
+        "https://res.cloudinary.com/daqocsd8z/image/upload/v1772128002/travel-diary/r5sflambtjpzmsy1uzlm.png",
+        "https://res.cloudinary.com/daqocsd8z/image/upload/v1772128003/travel-diary/ptnduro8tnrf979wrb7y.png"
       ],
       "weather": {
         "temperature": 0.9,
@@ -47,7 +47,7 @@
       "lon": -99.25715305391242,
       "description": "我去北极跟北极熊打架啦！！！",
       "imagePaths": [
-        "/uploads/1770630120269-187030813.JPG"
+        "https://res.cloudinary.com/daqocsd8z/image/upload/v1772128006/travel-diary/l0u5xi3f2la3auu3iiet.jpg"
       ],
       "photoDate": "2027-11-18",
       "weather": {
@@ -211,7 +211,7 @@
       "lon": -36.475051828583105,
       "description": "（AI 将自动生成日记）",
       "imagePaths": [
-        "/uploads/1770834426540-573557840.JPG"
+        "https://res.cloudinary.com/daqocsd8z/image/upload/v1772128009/travel-diary/j4ymfehfdhllwdhh9kfr.jpg"
       ],
       "weather": {
         "temperature": -48,
@@ -264,13 +264,13 @@
       "lon": -6.511891666666667,
       "description": "（AI 将自动生成日记）",
       "imagePaths": [
-        "/uploads/1770855512014-752356307.JPG",
-        "/uploads/1770855512056-120685774.JPG",
-        "/uploads/1770855512075-743121907.HEIC",
-        "/uploads/1770855512077-950221101.HEIC",
-        "/uploads/1770855512081-373180756.JPG",
-        "/uploads/1770855512116-342280863.HEIC",
-        "/uploads/1770855512122-816422206.HEIC"
+        "https://res.cloudinary.com/daqocsd8z/image/upload/v1772128016/travel-diary/febelxxjergq8ymwuebi.jpg",
+        "https://res.cloudinary.com/daqocsd8z/image/upload/v1772128018/travel-diary/ig0f0ogo1ljkdxltdmsb.jpg",
+        "https://res.cloudinary.com/daqocsd8z/image/upload/v1772128020/travel-diary/uk1he2i6epjzuj8ynq8u.heic",
+        "https://res.cloudinary.com/daqocsd8z/image/upload/v1772128024/travel-diary/cxgeknml69cjdf1nl3i0.heic",
+        "/uploads/1772128026406-940142333.JPG",
+        "https://res.cloudinary.com/daqocsd8z/image/upload/v1772128029/travel-diary/aylkicbjexc41fpjleov.heic",
+        "https://res.cloudinary.com/daqocsd8z/image/upload/v1772128031/travel-diary/txtz8gum1ink12rd8onw.heic"
       ],
       "photoDate": "2026-01-30",
       "weather": {
@@ -516,18 +516,18 @@
       ],
       "chibiSvgPath": "/uploads/chibi-1770855997101.svg",
       "chibiImagePaths": [
-        "/uploads/chibi-1770855997101-1.png",
-        "/uploads/chibi-1770855997101-2.png"
+        "https://res.cloudinary.com/daqocsd8z/image/upload/v1772128033/travel-diary/jxp1zcaxdqlx52b1mvds.png",
+        "https://res.cloudinary.com/daqocsd8z/image/upload/v1772128035/travel-diary/ikjg26st7nmqehkgt2ey.png"
       ],
-      "chibiImagePath": "/uploads/chibi-1770855997101-1.png"
+      "chibiImagePath": "https://res.cloudinary.com/daqocsd8z/image/upload/v1772128033/travel-diary/jxp1zcaxdqlx52b1mvds.png"
     },
     {
       "lat": 55.24036666666667,
       "lon": -6.511891666666667,
       "description": "（AI 将自动生成日记）",
       "imagePaths": [
-        "/uploads/1770895221305-932468833.HEIC",
-        "/uploads/1770895221320-756696185.HEIC"
+        "https://res.cloudinary.com/daqocsd8z/image/upload/v1772128037/travel-diary/yvyocs67ekqet35skmre.heic",
+        "https://res.cloudinary.com/daqocsd8z/image/upload/v1772128039/travel-diary/yvkwdvjgnrwbirc2roei.heic"
       ],
       "photoDate": "2026-01-31",
       "weather": {
@@ -573,16 +573,16 @@
       ],
       "chibiSvgPath": "/uploads/chibi-1770895244988.svg",
       "chibiImagePaths": [
-        "/uploads/chibi-1770895244988-1.png"
+        "https://res.cloudinary.com/daqocsd8z/image/upload/v1772128042/travel-diary/qoldpictydlaafxcligm.png"
       ],
-      "chibiImagePath": "/uploads/chibi-1770895244988-1.png"
+      "chibiImagePath": "https://res.cloudinary.com/daqocsd8z/image/upload/v1772128042/travel-diary/qoldpictydlaafxcligm.png"
     },
     {
       "lat": 24.20185107374813,
       "lon": -47.346768173346675,
       "description": "（AI 将自动生成日记）",
       "imagePaths": [
-        "/uploads/1770895989264-672855143.JPG"
+        "https://res.cloudinary.com/daqocsd8z/image/upload/v1772128044/travel-diary/uourvijltxorflw2xncp.jpg"
       ],
       "photoDate": "2026-02-02",
       "weather": {
@@ -668,16 +668,16 @@
       ],
       "chibiSvgPath": "/uploads/chibi-1770896061015.svg",
       "chibiImagePaths": [
-        "/uploads/chibi-1770896061015-1.png"
+        "https://res.cloudinary.com/daqocsd8z/image/upload/v1772128046/travel-diary/seypwwmgiwvgsbj38m53.png"
       ],
-      "chibiImagePath": "/uploads/chibi-1770896061015-1.png"
+      "chibiImagePath": "https://res.cloudinary.com/daqocsd8z/image/upload/v1772128046/travel-diary/seypwwmgiwvgsbj38m53.png"
     },
     {
       "lat": -85.75392400083427,
       "lon": 97.1717316079102,
       "description": "（AI 将自动生成日记）",
       "imagePaths": [
-        "/uploads/1770925370751-579409924.jpeg"
+        "https://res.cloudinary.com/daqocsd8z/image/upload/v1772128047/travel-diary/outrbvuvekfytbr7etd9.jpg"
       ],
       "weather": {
         "temperature": -48.2,
@@ -799,7 +799,7 @@
       "lon": -85.48572685705949,
       "description": "（AI 将自动生成日记）",
       "imagePaths": [
-        "/uploads/1770925658885-416646711.JPG"
+        "https://res.cloudinary.com/daqocsd8z/image/upload/v1772128050/travel-diary/q7txcnvgfxv434wo4a2j.jpg"
       ],
       "weather": {
         "temperature": -28.1,
@@ -840,16 +840,16 @@
       ],
       "chibiSvgPath": "/uploads/chibi-1770925672342.svg",
       "chibiImagePaths": [
-        "/uploads/chibi-1770925672342-1.png"
+        "https://res.cloudinary.com/daqocsd8z/image/upload/v1772128051/travel-diary/q0ycsd3j4s0kde7zb3oe.png"
       ],
-      "chibiImagePath": "/uploads/chibi-1770925672342-1.png"
+      "chibiImagePath": "https://res.cloudinary.com/daqocsd8z/image/upload/v1772128051/travel-diary/q0ycsd3j4s0kde7zb3oe.png"
     },
     {
       "lat": -17.932403541623557,
       "lon": -51.49727724194793,
       "description": "（AI 将自动生成日记）",
       "imagePaths": [
-        "/uploads/1770925830849-834697361.JPG"
+        "https://res.cloudinary.com/daqocsd8z/image/upload/v1772128053/travel-diary/szwuxqfwer9m6fdihfob.jpg"
       ],
       "weather": {
         "temperature": 25.2,
@@ -886,7 +886,7 @@
       "lon": -68.01509974893975,
       "description": "（AI 将自动生成日记）",
       "imagePaths": [
-        "/uploads/1770925874810-419049584.JPG"
+        "https://res.cloudinary.com/daqocsd8z/image/upload/v1772128057/travel-diary/orpmhdbgbz2cnfyqcst8.jpg"
       ],
       "weather": {
         "temperature": 5.7,
@@ -927,10 +927,10 @@
       "lon": -8.466023023849289,
       "description": "（AI 将自动生成日记）",
       "imagePaths": [
-        "/uploads/1770937194756-34446371.JPG",
-        "/uploads/1770937194793-114976867.JPG",
-        "/uploads/1770937194826-682121006.jpg",
-        "/uploads/1770937194851-761546545.JPG"
+        "https://res.cloudinary.com/daqocsd8z/image/upload/v1772128060/travel-diary/rqjgzuh0j3clfxvpredd.jpg",
+        "https://res.cloudinary.com/daqocsd8z/image/upload/v1772128063/travel-diary/q54pjqxyh2qcjw3c0u7z.jpg",
+        "https://res.cloudinary.com/daqocsd8z/image/upload/v1772128067/travel-diary/y52r1wiw3a1amqtzrlos.jpg",
+        "https://res.cloudinary.com/daqocsd8z/image/upload/v1772128069/travel-diary/pfm7p3jpuwbmroz4vwrz.jpg"
       ],
       "weather": {
         "temperature": 14.9,
@@ -1003,26 +1003,26 @@
       ],
       "chibiSvgPath": "/uploads/chibi-1770937350412.svg",
       "chibiImagePaths": [
-        "/uploads/chibi-1770937350412-1.png"
+        "https://res.cloudinary.com/daqocsd8z/image/upload/v1772128071/travel-diary/dzjtgaddzuy1klulzonx.png"
       ],
-      "chibiImagePath": "/uploads/chibi-1770937350412-1.png"
+      "chibiImagePath": "https://res.cloudinary.com/daqocsd8z/image/upload/v1772128071/travel-diary/dzjtgaddzuy1klulzonx.png"
     },
     {
       "lat": 64.16265,
       "lon": -22.012741666666667,
       "description": "（AI 将自动生成日记）",
       "imagePaths": [
-        "/uploads/1771029194329-305836398.jpg",
-        "/uploads/1771029194348-945693518.jpg",
-        "/uploads/1771029194355-483056400.JPG",
-        "/uploads/1771029194360-551604273.jpg",
-        "/uploads/1771029194379-244731639.jpg",
-        "/uploads/1771029194396-897490422.JPG",
-        "/uploads/1771029194535-411021316.heic",
-        "/uploads/1771029194539-24930065.JPG",
-        "/uploads/1771029194609-700238926.JPG",
-        "/uploads/1771029194665-401978234.JPG",
-        "/uploads/1771029194726-527730503.JPG"
+        "https://res.cloudinary.com/daqocsd8z/image/upload/v1772128073/travel-diary/zdwanbvk5q1zpz4bd1hu.jpg",
+        "https://res.cloudinary.com/daqocsd8z/image/upload/v1772128076/travel-diary/sxy3rwi562nkxr6kt5yv.jpg",
+        "https://res.cloudinary.com/daqocsd8z/image/upload/v1772128078/travel-diary/rwenibn1cwoveaotpxxb.jpg",
+        "https://res.cloudinary.com/daqocsd8z/image/upload/v1772128080/travel-diary/zztgjl66vaqc5cs7euuz.jpg",
+        "https://res.cloudinary.com/daqocsd8z/image/upload/v1772128083/travel-diary/u6mh4tjcwzebttfs7rnt.jpg",
+        "/uploads/1772128085703-798770940.JPG",
+        "https://res.cloudinary.com/daqocsd8z/image/upload/v1772128089/travel-diary/xexkrpcyahds4anh9peu.heic",
+        "/uploads/1772128090764-408173335.JPG",
+        "/uploads/1772128093591-880679632.JPG",
+        "/uploads/1772128096289-967867195.JPG",
+        "/uploads/1772128099250-690380651.JPG"
       ],
       "photoDate": "2025-12-10",
       "weather": {
@@ -1183,11 +1183,11 @@
       "aiSummary": "冰岛的记忆如同梦境，在脑海中缓缓流淌。最难忘的，是那深入蓝冰洞的旅程。每一块冰都巨大而纯粹，在阳光的照耀下，折射出梦幻般的蓝色光芒。仿佛置身于水晶宫殿，又如同坠入深邃的海底世界，幽蓝而神秘。更幸运的是，那夜，极光降临。头一次亲眼目睹极光，那种震撼无法言喻。肉眼可见的绿色光带在夜空中舞动，如精灵般飘逸。我屏住呼吸，生怕惊扰了这片刻的宁静与美好，手中的相机努力捕捉着这稍纵即逝的绚烂。那份激动和喜悦，如同冰洞中的蓝色光芒，深深地烙印在我的心中，永不褪色。",
       "characterStyles": [],
       "chibiImagePaths": [
-        "/uploads/chibi-1771029351463-1.png",
-        "/uploads/chibi-1771029351463-2.png",
+        "https://res.cloudinary.com/daqocsd8z/image/upload/v1772128101/travel-diary/mtlyaqhsfzbogb5rsoq4.png",
+        "https://res.cloudinary.com/daqocsd8z/image/upload/v1772128103/travel-diary/xstijgo8adnkdvfu1i4z.png",
         "/uploads/chibi-1771029351463-3.png"
       ],
-      "chibiImagePath": "/uploads/chibi-1771029351463-1.png"
+      "chibiImagePath": "https://res.cloudinary.com/daqocsd8z/image/upload/v1772128101/travel-diary/mtlyaqhsfzbogb5rsoq4.png"
     }
   ],
   "plans": [
