@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: travel-diary
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    autoDeploy: true
+    envVars:
+      - key: GEMINI_API_KEY
+        sync: false

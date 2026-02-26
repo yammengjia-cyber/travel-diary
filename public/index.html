@@ -1,0 +1,2724 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Travel Diary - 地球旅行日记</title>
+    <style>
+        /* ========== 全局样式 ========== */
+        body { margin:0; overflow:hidden; height:100vh; cursor:grab; position:relative; background:#5a4a6a; }
+        body::before { content:''; position:fixed; inset:0; z-index:0; background:url('/background.png') center/cover no-repeat; opacity:.45; animation:bgBreath 12s ease-in-out infinite; }
+        /* 紫色覆盖 + 光照方向模拟（左侧冷亮、右侧暖暗） */
+        body::after { content:''; position:fixed; inset:0; z-index:0; background:linear-gradient(90deg,rgba(200,220,255,0.10) 0%,rgba(120,125,155,0.50) 25%,rgba(135,115,120,0.55) 75%,rgba(40,20,10,0.15) 100%); pointer-events:none; }
+        @keyframes bgBreath { 0%,100%{transform:scale(1);opacity:.4} 50%{transform:scale(1.02) translate(.5%,.5%);opacity:.5} }
+        body:active { cursor:grabbing; }
+        canvas { display:block; position:absolute; inset:0; z-index:1; background:transparent; }
+
+        /* ========== 左上角 UI ========== */
+        #ui-container { position:absolute; top:50px; left:50px; z-index:10; }
+        #ui-container p { pointer-events:none; }
+        #btn-add-record { margin-top:20px; padding:10px 20px; border:none; border-radius:8px; background:#A78BB3; color:#fff; font-size:14px; font-weight:600; cursor:pointer; letter-spacing:1px; box-shadow:0 2px 8px rgba(0,0,0,.15); display:block; }
+        #btn-add-record:hover { background:#9575a8; }
+        #btn-add-record.mode { background:#7a6b8a; }
+        #btn-add-plan { margin-top:8px; padding:10px 20px; border:none; border-radius:8px; background:#A78BB3; color:#fff; font-size:14px; font-weight:600; cursor:pointer; letter-spacing:1px; box-shadow:0 2px 8px rgba(0,0,0,.15); display:block; }
+        #btn-add-plan:hover { background:#9575a8; }
+        h1 { font-family:'Times New Roman',serif; color:#333; font-size:3rem; font-weight:300; letter-spacing:4px; margin:0; }
+        p { font-family:sans-serif; color:#555; font-size:.85rem; letter-spacing:2px; margin-top:15px; text-transform:uppercase; font-weight:600; }
+        .gps-hint { font-size:11px; color:#A78BB3; margin-top:4px; }
+
+        /* ========== 纬度轴 ========== */
+        #lat-axis { position:fixed; right:20px; top:50%; transform:translateY(-50%); z-index:10; pointer-events:none; width:65px; }
+        #lat-axis canvas { display:block; }
+
+        /* ========== 表单弹窗 ========== */
+        #form-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.4); z-index:100; justify-content:center; align-items:center; }
+        #form-overlay.show { display:flex; }
+        #form-box { background:#fff; border-radius:12px; padding:24px; min-width:400px; max-width:480px; box-shadow:0 8px 32px rgba(0,0,0,.2); max-height:92vh; overflow-y:auto; scrollbar-width:none; }
+        #form-box::-webkit-scrollbar { display:none; }
+        #form-box h3 { margin:0 0 12px; color:#333; }
+        #form-box label { display:block; margin-top:10px; color:#555; font-size:14px; }
+        #form-box input[type="text"], #form-box textarea { width:100%; padding:10px; margin-top:4px; box-sizing:border-box; border:1px solid #ddd; border-radius:6px; font-size:14px; }
+        #form-box textarea { min-height:36px; height:36px; resize:vertical; }
+        #form-box input[type="file"] { margin-top:4px; font-size:13px; }
+        #form-box .btns { margin-top:16px; display:flex; gap:10px; justify-content:flex-end; }
+        #form-box button { padding:10px 20px; border:none; border-radius:6px; cursor:pointer; font-size:14px; font-weight:600; }
+        #form-box button.cancel { background:#eee; color:#555; }
+        #form-box button.save { background:#A78BB3; color:#fff; }
+        #form-box button.save:hover { background:#9575a8; }
+        #form-box .coord { font-size:12px; color:#888; margin-top:4px; }
+        #image-count { font-size:11px; color:#A78BB3; margin-top:4px; }
+        #btn-map-locate { margin-top:10px; padding:8px 16px; border:1px dashed #A78BB3; border-radius:6px; background:rgba(167,139,179,0.06); color:#A78BB3; font-size:13px; cursor:pointer; display:block; width:100%; text-align:center; }
+        #btn-map-locate:hover { background:rgba(167,139,179,0.15); }
+        /* 拍摄日期选择器 */
+        #date-section { margin-top:10px; }
+        #date-section label { font-size:13px; color:#555; }
+        #photo-date { padding:8px 12px; border:1px solid #ddd; border-radius:6px; font-size:13px; margin-top:4px; width:100%; box-sizing:border-box; color:#555; }
+        #photo-date:focus { border-color:#A78BB3; outline:none; }
+
+        /* ========== AI 聊天区域 ========== */
+        #chat-section { margin-top:14px; border:1px solid #e0e4f0; border-radius:10px; overflow:hidden; background:#fafbfd; }
+        #chat-section .chat-header { padding:8px 14px; background:linear-gradient(135deg,#7ba0c4,#8a7fb8); color:#fff; font-size:13px; font-weight:600; display:flex; justify-content:space-between; align-items:center; }
+        #chat-section .chat-header .chat-status { font-size:11px; font-weight:400; opacity:.8; }
+        #chat-messages { height:220px; overflow-y:auto; padding:12px; scrollbar-width:thin; scrollbar-color:#c0c8e0 transparent; }
+        #chat-messages::-webkit-scrollbar { width:4px; }
+        #chat-messages::-webkit-scrollbar-thumb { background:#c0c8e0; border-radius:2px; }
+        .chat-msg { display:flex; margin-bottom:10px; gap:8px; animation:chatFadeIn 0.35s ease-out; }
+        @keyframes chatFadeIn { from{opacity:0;transform:translateY(6px) scale(0.98)} to{opacity:1;transform:translateY(0) scale(1)} }
+        .chat-msg.ai { justify-content:flex-start; }
+        .chat-msg.user { justify-content:flex-end; }
+        .chat-bubble { max-width:78%; padding:8px 12px; border-radius:12px; font-size:13px; line-height:1.6; word-break:break-word; white-space:pre-wrap; transition:transform 0.15s ease, box-shadow 0.15s ease; }
+        .chat-msg:hover .chat-bubble { transform:translateY(-1px); box-shadow:0 2px 8px rgba(100,90,130,0.12); }
+        .chat-msg.ai .chat-bubble { background:linear-gradient(135deg,#e8e4f2,#dde8f4); color:#3a4060; border-bottom-left-radius:4px; }
+        .chat-msg.user .chat-bubble { background:linear-gradient(135deg,#8baac8,#9b8bb8); color:#fff; border-bottom-right-radius:4px; }
+        .chat-msg .chat-avatar { width:28px; height:28px; border-radius:50%; flex-shrink:0; display:flex; align-items:center; justify-content:center; font-size:14px; }
+        .chat-msg.ai .chat-avatar { background:#dde4f0; }
+        .chat-msg.user .chat-avatar { background:#b8c8d8; }
+        .chat-typing { display:flex; gap:4px; padding:4px 0; }
+        .chat-typing span { width:6px; height:6px; border-radius:50%; background:#a090b8; animation:typingDot 1.2s infinite; }
+        .chat-bubble.typing-active { position:relative; }
+        .chat-bubble .typing-cursor { display:inline-block; width:2px; height:1.1em; background:#6a7a9a; margin-left:2px; vertical-align:text-bottom; animation:typingBlink 0.8s ease-in-out infinite; }
+        @keyframes typingBlink { 0%,50%{opacity:1} 51%,100%{opacity:0.3} }
+        .chat-typing span:nth-child(2) { animation-delay:0.2s; }
+        .chat-typing span:nth-child(3) { animation-delay:0.4s; }
+        @keyframes typingDot { 0%,80%,100%{opacity:.3;transform:scale(0.8)} 40%{opacity:1;transform:scale(1.1)} }
+
+        /* 聊天输入区 */
+        #chat-input-area { padding:10px 12px; border-top:1px solid #ece4f4; display:flex; gap:8px; align-items:center; background:#fff; }
+        #chat-text-input { flex:1; padding:8px 12px; border:1px solid #ddd; border-radius:18px; font-size:13px; outline:none; transition:border-color 0.2s; }
+        #chat-text-input:focus { border-color:#A78BB3; }
+        #btn-voice { width:40px; height:40px; border-radius:50%; border:none; background:linear-gradient(135deg,#7ba0c4,#8a7fb8); color:#fff; font-size:18px; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:all 0.2s; position:relative; }
+        #btn-voice:hover { transform:scale(1.05); box-shadow:0 2px 12px rgba(100,120,180,0.3); }
+        #btn-voice.recording { background:linear-gradient(135deg,#e07070,#c05050); animation:voicePulse 1.5s ease-in-out infinite; }
+        @keyframes voicePulse { 0%,100%{box-shadow:0 0 0 0 rgba(200,80,80,0.4)} 50%{box-shadow:0 0 0 12px rgba(200,80,80,0)} }
+        #btn-chat-send { width:36px; height:36px; border-radius:50%; border:none; background:linear-gradient(135deg,#7ba0c4,#8a7fb8); color:#fff; font-size:15px; cursor:pointer; display:flex; align-items:center; justify-content:center; }
+        #btn-chat-send:hover { background:#6a90b8; }
+
+        /* 粒子球容器 */
+        #voice-sphere-wrap { display:none; position:relative; margin:10px auto; width:160px; height:160px; }
+        #voice-sphere-wrap.show { display:block; }
+        #voice-sphere-canvas { width:160px; height:160px; }
+        #voice-interim { position:absolute; bottom:-24px; left:50%; transform:translateX(-50%); font-size:11px; color:#a090b8; white-space:nowrap; max-width:280px; overflow:hidden; text-overflow:ellipsis; }
+        #btn-stop-voice { display:none; margin:4px auto 0; padding:5px 16px; border:1px solid rgba(200,100,100,0.4); border-radius:14px; background:rgba(200,80,80,0.1); color:#c06060; font-size:11px; cursor:pointer; text-align:center; }
+        #btn-stop-voice.show { display:block; }
+        #btn-stop-voice:hover { background:rgba(200,80,80,0.2); }
+
+        /* ========== 记录详情弹窗（深紫发光信封） ========== */
+        #detail-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.65); z-index:200; justify-content:center; align-items:center; }
+        #detail-overlay.show { display:flex; }
+
+        /* 信封容器（包含粒子Canvas + 信封主体 + 装饰信封 + Q版角色） */
+        .envelope-wrap { position:relative; max-width:520px; width:92%; overflow:visible; }
+
+        /* Q版角色：信封左侧，底部对齐，紧凑并排 */
+        .envelope-chibi-wrap {
+            position:absolute; right:100%; margin-right:6px; bottom:5%; z-index:5;
+            display:flex; align-items:flex-end; flex-direction:row;
+            pointer-events:none;
+        }
+        .envelope-chibi-wrap .chibi-item {
+            height:300px; flex-shrink:0;
+            animation:chibiStand 3s ease-in-out infinite;
+        }
+        .envelope-chibi-wrap .chibi-item.chibi-ai-img {
+            height:300px;
+            filter:drop-shadow(0 2px 10px rgba(60,30,90,0.35));
+        }
+        .envelope-chibi-wrap .chibi-item + .chibi-item {
+            margin-left:-25px;
+        }
+        .envelope-chibi-wrap .chibi-item.chibi-ai-img img {
+            height:100%; width:auto; display:block;
+        }
+        .envelope-chibi-wrap .chibi-item:nth-child(2) { animation-delay:0.15s; }
+        .envelope-chibi-wrap .chibi-item:nth-child(3) { animation-delay:0.3s; }
+        @keyframes chibiStand { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-4px)} }
+        .envelope-chibi-wrap svg { width:100%; height:100%; filter:drop-shadow(0 3px 6px rgba(0,0,0,0.25)); }
+
+        /* 左侧装饰信封（倒20度，接近主信封大小） */
+        .envelope-deco {
+            position:absolute; left:-80px; top:50%; width:90%; height:80%;
+            transform:translateY(-50%) rotate(-20deg);
+            z-index:0; pointer-events:none; opacity:0;
+            animation: decoFadeIn 0.8s ease-out 0.2s forwards;
+        }
+        @keyframes decoFadeIn { 0%{opacity:0;transform:translateY(-50%) rotate(-20deg) translateX(-30px)} 100%{opacity:1;transform:translateY(-50%) rotate(-20deg) translateX(0)} }
+        .envelope-deco-body {
+            width:100%; height:100%; border-radius:8px;
+            background:rgba(90,60,130,0.4);
+            backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px);
+            border:1px solid rgba(180,140,255,0.15);
+            box-shadow:0 4px 15px rgba(0,0,0,0.25);
+            position:relative; overflow:hidden;
+        }
+        /* 装饰信封粒子Canvas */
+        #deco-particles {
+            position:absolute; top:-30px; left:-30px;
+            width:calc(100% + 60px); height:calc(100% + 60px);
+            pointer-events:none; z-index:2;
+        }
+        /* 装饰信封的翻盖（向下折叠，盖在信封正面） */
+        .envelope-deco-flap {
+            position:absolute; top:0; left:0; width:100%; height:30%;
+            background:rgba(100,65,150,0.5);
+            clip-path:polygon(0 0, 100% 0, 50% 100%);
+            filter:drop-shadow(0 2px 6px rgba(0,0,0,0.15));
+        }
+        /* 装饰信封内线条 */
+        .envelope-deco-body::after {
+            content:''; position:absolute; top:25%; left:15%; right:15%; height:1px;
+            background:rgba(255,255,255,0.12);
+            box-shadow:0 18px 0 rgba(255,255,255,0.09), 0 36px 0 rgba(255,255,255,0.06), 0 54px 0 rgba(255,255,255,0.04);
+        }
+
+        /* 粒子Canvas，绝对定位铺满+外扩 */
+        #envelope-particles { position:absolute; top:-40px; left:-40px; width:calc(100% + 80px); height:calc(100% + 80px); pointer-events:none; z-index:0; }
+
+        /* 信封主体：浅紫半透明毛玻璃 */
+        .envelope-card {
+            position:relative; z-index:1; border-radius:10px; overflow:visible;
+            background:rgba(80,50,120,0.55);
+            backdrop-filter:blur(28px); -webkit-backdrop-filter:blur(28px);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+            border:1px solid rgba(200,160,255,0.15);
+            animation: envelopeAppear 0.5s ease-out;
+            max-height:90vh; overflow-y:auto; scrollbar-width:none; -ms-overflow-style:none;
+        }
+        .envelope-card::-webkit-scrollbar { display:none; }
+        @keyframes envelopeAppear { 0%{transform:scale(0.85) translateY(30px);opacity:0} 100%{transform:scale(1) translateY(0);opacity:1} }
+
+        /* 主信封不需要翻盖三角，隐藏 */
+        .envelope-opening { display:none; }
+        .envelope-flap-wrap { display:none; }
+
+        /* 信封正文区 */
+        .envelope-body { padding:24px 36px 24px; position:relative; }
+
+        /* 宝丽来照片散落区 */
+        .polaroid-area { display:flex; flex-wrap:wrap; gap:12px; justify-content:center; margin-bottom:20px; max-height:320px; overflow-y:auto; padding:8px 0; scrollbar-width:none; -ms-overflow-style:none; }
+        .polaroid-area::-webkit-scrollbar { display:none; }
+        .polaroid {
+            background:#fff; padding:6px 6px 24px 6px; border-radius:2px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.4), 0 0 1px rgba(255,255,255,0.1);
+            width:140px; flex-shrink:0;
+            opacity:0; transform:translateY(40px) scale(0.8);
+            transition: opacity 0.4s ease-out, transform 0.4s ease-out;
+        }
+        .polaroid.show { opacity:1; /* transform set by JS with rotation */ }
+        .polaroid img { width:100%; height:100px; object-fit:cover; display:block; border-radius:1px; }
+        .polaroid-label { font-size:9px; color:#888; text-align:center; margin-top:6px; font-family:'Times New Roman',serif; }
+
+        /* 信封内文字样式 */
+        .envelope-card .card-desc { font-size:15px; color:rgba(255,245,255,0.95); line-height:1.7; white-space:pre-wrap; text-shadow:0 1px 4px rgba(0,0,0,0.3); }
+        .envelope-card .card-weather { font-size:13px; color:rgba(220,200,240,0.85); margin-top:12px; padding:10px 14px; background:rgba(255,255,255,0.08); border-radius:6px; backdrop-filter:blur(4px); }
+        .envelope-card .card-meta { font-size:11px; color:rgba(200,180,220,0.7); margin-top:12px; }
+        .envelope-card .card-close { position:absolute; top:8px; right:12px; font-size:22px; color:rgba(255,255,255,0.7); cursor:pointer; z-index:3; transition:color 0.2s; }
+        .envelope-card .card-close:hover { color:#fff; }
+        .envelope-card .card-continue-chat { padding:8px 16px; border:1px solid rgba(150,160,220,0.3); border-radius:6px; background:transparent; color:rgba(180,190,255,0.8); font-size:12px; cursor:pointer; transition:all 0.2s; }
+        .envelope-card .card-continue-chat:hover { background:rgba(120,130,200,0.15); border-color:rgba(150,160,220,0.5); color:#bbc4ff; }
+        .envelope-card .card-delete { padding:8px 16px; border:1px solid rgba(200,150,180,0.3); border-radius:6px; background:transparent; color:rgba(255,180,180,0.7); font-size:12px; cursor:pointer; display:inline-block; transition:all 0.2s; }
+        .envelope-card .card-delete:hover { background:rgba(255,100,100,0.1); border-color:rgba(255,150,150,0.5); color:#faa; }
+
+        /* ========== 漂浮关键词气泡 ========== */
+        .keywords-float {
+            position:absolute; right:-300px; top:50%; transform:translateY(-50%);
+            width:290px; display:flex; flex-wrap:wrap; gap:6px; align-items:flex-start; align-content:flex-start;
+            justify-content:center;
+            pointer-events:none; z-index:2;
+            border:1px dashed rgba(200,160,255,0.25); border-radius:10px;
+            padding:12px 10px; min-height:60px; max-height:62vh; overflow-y:auto;
+            scrollbar-width:none; -ms-overflow-style:none;
+        }
+        .keywords-float::-webkit-scrollbar { width:0; height:0; display:none; background:transparent; }
+        .keywords-float:empty { border-color:transparent; }
+        .kw-bubble {
+            display:inline-block; width:auto; text-align:center; padding:4px 14px; border-radius:8px;
+            font-weight:500; letter-spacing:0.3px;
+            backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px);
+            white-space:nowrap; pointer-events:auto; cursor:pointer;
+            position:relative; transition:all 0.15s;
+            animation:kwFloat var(--kw-dur, 3s) ease-in-out infinite alternate;
+            animation-delay:var(--kw-delay, 0s);
+        }
+        .kw-bubble:hover { transform:scale(1.05); filter:brightness(1.2); }
+        .kw-bubble.big { font-size:13px; padding:5px 16px; font-weight:600; }
+        .kw-bubble.small { font-size:11px; padding:4px 12px; }
+        @keyframes kwFloat {
+            0%{transform:translateY(0) scale(1)} 100%{transform:translateY(var(--kw-dy, -4px)) scale(var(--kw-scale, 1.04))}
+        }
+        .kw-bubble.purple { background:rgba(120,130,200,0.3); color:rgba(210,215,255,0.95); border:1px solid rgba(150,160,240,0.2); }
+        .kw-bubble.purple.big { background:rgba(100,160,200,0.3); color:rgba(200,230,255,0.95); border:1px solid rgba(130,180,240,0.25); }
+        .kw-bubble.warm { background:rgba(200,130,80,0.3); color:rgba(255,220,200,0.95); border:1px solid rgba(240,160,120,0.2); }
+        .kw-bubble.warm.big { background:rgba(200,160,60,0.3); color:rgba(255,240,200,0.95); border:1px solid rgba(230,190,100,0.25); }
+
+        /* 查看完整对话按钮 */
+        .btn-view-chat {
+            position:absolute; right:-290px; bottom:20px; z-index:3;
+            padding:6px 14px; border:1px solid rgba(200,160,255,0.25); border-radius:16px;
+            background:rgba(80,50,120,0.4); backdrop-filter:blur(8px);
+            color:rgba(220,200,255,0.8); font-size:11px; cursor:pointer;
+            transition:all 0.2s;
+        }
+        .btn-view-chat:hover { background:rgba(100,60,150,0.5); color:#fff; }
+
+        /* 完整聊天记录弹窗 */
+        .chat-log-modal {
+            position:fixed; inset:0; z-index:300; background:rgba(0,0,0,.5);
+            display:flex; justify-content:center; align-items:center;
+        }
+        .chat-log-card {
+            background:#fff; border-radius:12px; width:90%; max-width:500px; max-height:80vh;
+            display:flex; flex-direction:column; overflow:hidden;
+            box-shadow:0 8px 32px rgba(0,0,0,.3);
+        }
+        .chat-log-header {
+            padding:14px 18px; background:linear-gradient(135deg,#A78BB3,#8a6fa0); color:#fff;
+            font-size:14px; font-weight:600; display:flex; justify-content:space-between; align-items:center;
+        }
+        .chat-log-close { font-size:20px; cursor:pointer; opacity:.8; }
+        .chat-log-close:hover { opacity:1; }
+        .chat-log-body { padding:16px; overflow-y:auto; flex:1; }
+        .chat-log-body .cl-msg { display:flex; margin-bottom:10px; gap:8px; }
+        .chat-log-body .cl-msg.ai { justify-content:flex-start; }
+        .chat-log-body .cl-msg.user { justify-content:flex-end; }
+        .chat-log-body .cl-bubble { max-width:80%; padding:8px 12px; border-radius:12px; font-size:13px; line-height:1.6; white-space:pre-wrap; }
+        .chat-log-body .cl-msg.ai .cl-bubble { background:#f0e8f8; color:#4a3660; border-bottom-left-radius:4px; }
+        .chat-log-body .cl-msg.user .cl-bubble { background:#A78BB3; color:#fff; border-bottom-right-radius:4px; }
+        .cl-kw-mark {
+            background:linear-gradient(135deg, rgba(250,235,146,0.6), rgba(220,185,255,0.5));
+            color:#2c1840; font-weight:700; padding:1px 4px; border-radius:3px;
+        }
+
+        /* ========== 选位模式提示条 ========== */
+        #pick-hint { display:none; position:fixed; top:0; left:0; right:0; z-index:80; text-align:center; padding:12px 20px; background:rgba(60,40,80,0.85); backdrop-filter:blur(6px); color:#fff; font-size:14px; letter-spacing:1px; font-weight:500; }
+        #pick-hint.show { display:block; }
+        #pick-hint .hint-cancel { margin-left:16px; padding:4px 14px; border:1px solid rgba(255,255,255,.5); border-radius:4px; background:transparent; color:#fff; font-size:12px; cursor:pointer; }
+        #pick-hint .hint-cancel:hover { background:rgba(255,255,255,.15); }
+
+        /* ========== 定位确认卡片 ========== */
+        #loc-confirm { display:none; position:fixed; z-index:90; background:#fff; border-radius:10px; padding:18px 22px; min-width:260px; box-shadow:0 8px 32px rgba(0,0,0,.3); }
+        #loc-confirm.show { display:block; }
+        #loc-confirm .loc-title { font-size:16px; font-weight:700; color:#333; margin-bottom:4px; }
+        #loc-confirm .loc-sub { font-size:12px; color:#888; margin-bottom:14px; }
+        #loc-confirm .loc-btns { display:flex; gap:10px; justify-content:flex-end; }
+        #loc-confirm .loc-btns button { padding:7px 18px; border:none; border-radius:6px; cursor:pointer; font-size:13px; font-weight:600; }
+        #loc-confirm .loc-btn-cancel { background:#eee; color:#666; }
+        #loc-confirm .loc-btn-cancel:hover { background:#ddd; }
+        #loc-confirm .loc-btn-ok { background:#A78BB3; color:#fff; }
+        #loc-confirm .loc-btn-ok:hover { background:#9575a8; }
+        #city-search-wrap { margin-top:8px; display:flex; gap:8px; }
+        #city-search-input {
+            flex:1; padding:8px 10px; border:1px solid rgba(167,139,179,0.35); border-radius:6px;
+            font-size:13px; color:#555; box-sizing:border-box;
+        }
+        #city-search-input:focus { outline:none; border-color:#A78BB3; box-shadow:0 0 0 2px rgba(167,139,179,0.15); }
+        #btn-city-search {
+            padding:8px 12px; border:1px solid rgba(167,139,179,0.35); border-radius:6px;
+            background:rgba(167,139,179,0.08); color:#7f6792; font-size:13px; cursor:pointer; white-space:nowrap;
+        }
+        #btn-city-search:hover { background:rgba(167,139,179,0.18); }
+    </style>
+</head>
+<body>
+    <!-- 左上角UI（去掉了独立的风景照按钮） -->
+    <div id="ui-container">
+        <h1>TRAVEL DIARY</h1>
+        <p>Purple Borders · 国家轮廓</p>
+        <button id="btn-add-record">记录旅行回忆📝</button>
+        <button id="btn-add-plan">未来旅行计划✈️</button>
+    </div>
+
+    <!-- 纬度轴 -->
+    <div id="lat-axis"><canvas id="lat-canvas" width="65" height="500"></canvas></div>
+
+    <!-- 选位模式提示条 -->
+    <div id="pick-hint">
+        🌍 旋转地球找到目标位置，然后 <b>右键点击</b> 选取定位
+        <button class="hint-cancel" id="pick-hint-cancel">取消选位</button>
+    </div>
+
+    <!-- 定位确认卡片 -->
+    <div id="loc-confirm">
+        <div class="loc-title" id="loc-country">--</div>
+        <div class="loc-sub" id="loc-coords">--</div>
+        <div class="loc-btns">
+            <button class="loc-btn-cancel" id="loc-cancel">重新选择</button>
+            <button class="loc-btn-ok" id="loc-ok">确定定位</button>
+        </div>
+    </div>
+
+    <!-- 表单弹窗（含 AI 聊天区域） -->
+    <div id="form-overlay">
+        <div id="form-box">
+            <h3>添加旅行记录</h3>
+            <div class="coord" id="coord-display">经纬度：--</div>
+            <div id="image-section">
+                <label>图片（可选，支持多张，自动读取GPS定位）</label>
+                <input type="file" id="image-input" accept="image/*" multiple style="margin-top:4px;">
+                <div id="image-count"></div>
+            </div>
+            <div class="gps-hint" id="gps-hint"></div>
+            <div id="date-section">
+                <label>拍摄日期（用于获取当时天气）</label>
+                <input type="date" id="photo-date" />
+            </div>
+            <button type="button" id="btn-map-locate">🌍 地图定位</button>
+            <div id="city-search-wrap">
+                <input type="text" id="city-search-input" placeholder="输入城市名，直接定位（如：阿姆斯特丹）" />
+                <button type="button" id="btn-city-search">搜索定位</button>
+            </div>
+
+            <!-- AI 聊天区域 -->
+            <div id="chat-section" style="display:none;">
+                <div class="chat-header">
+                    <span id="chat-title">✨ AI 旅行助手</span>
+                    <span class="chat-status" id="chat-status">等待开始...</span>
+                </div>
+                <!-- 粒子球录音动画 -->
+                <div id="voice-sphere-wrap">
+                    <canvas id="voice-sphere-canvas" width="320" height="320"></canvas>
+                    <div id="voice-interim"></div>
+                </div>
+                <button id="btn-stop-voice">点击结束录音</button>
+                <!-- 聊天消息区域 -->
+                <div id="chat-messages"></div>
+                <!-- 聊天输入区 -->
+                <div id="chat-input-area">
+                    <button id="btn-voice" title="语音输入">🎤</button>
+                    <input type="text" id="chat-text-input" placeholder="输入文字..." />
+                    <button id="btn-chat-send" title="发送">➤</button>
+                </div>
+            </div>
+
+            <!-- 文字描述（在有AI时作为备用/补充，在无AI时作为主输入） -->
+            <label id="desc-label">文字描述</label>
+            <textarea id="desc-input" placeholder="写下你的旅行感受..."></textarea>
+
+            <div class="btns">
+                <button type="button" class="cancel" id="btn-cancel">取消</button>
+                <button type="button" class="save" id="btn-save">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 记录详情弹窗（毛玻璃信封 + 宝丽来照片 + 漂浮关键词） -->
+    <div id="detail-overlay">
+        <div class="envelope-wrap">
+            <!-- 左侧 Q版 豆豆眼角色（旅行记录有照片时显示，最多3人） -->
+            <div class="envelope-chibi-wrap" id="envelope-chibi-wrap" style="display:none;"></div>
+            <!-- 左侧装饰信封 -->
+            <div class="envelope-deco">
+                <canvas id="deco-particles"></canvas>
+                <div class="envelope-deco-flap"></div>
+                <div class="envelope-deco-body"></div>
+            </div>
+            <canvas id="envelope-particles"></canvas>
+            <div class="envelope-card">
+                <span class="card-close" id="detail-close">&times;</span>
+                <div class="envelope-flap-wrap"><div class="envelope-flap"></div></div>
+                <div class="envelope-opening"></div>
+                <div class="envelope-body">
+                    <div class="polaroid-area" id="polaroid-area"></div>
+                    <div class="card-desc" id="detail-desc"></div>
+                    <div class="card-weather" id="detail-weather" style="display:none"></div>
+                    <div class="card-meta" id="detail-meta"></div>
+                    <div style="display:flex;gap:10px;align-items:center;margin-top:16px;">
+                        <button class="card-continue-chat" id="btn-continue-chat" style="display:none;">💬 继续聊天</button>
+                        <button class="card-delete" id="detail-delete">撤回此信箱</button>
+                    </div>
+                </div>
+            </div>
+            <!-- 右侧漂浮关键词区域 -->
+            <div class="keywords-float" id="keywords-float"></div>
+            <!-- 右下角查看完整对话按钮 -->
+            <button class="btn-view-chat" id="btn-view-chat" style="display:none;">💬 查看对话</button>
+        </div>
+        <!-- 完整聊天记录弹窗 -->
+        <div class="chat-log-modal" id="chat-log-modal" style="display:none;">
+            <div class="chat-log-card">
+                <div class="chat-log-header">
+                    <span>完整对话记录</span>
+                    <span class="chat-log-close" id="chat-log-close">&times;</span>
+                </div>
+                <div class="chat-log-body" id="chat-log-body"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/heic2any.min.js"></script>
+    <script type="importmap">
+        { "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js", "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/" } }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { FontLoader } from 'three/addons/loaders/FontLoader.js';
+        import { TextGeometry } from 'three/addons/geometries/TextGeometry.js';
+        import { Line2 } from 'three/addons/lines/Line2.js';
+        import { LineGeometry } from 'three/addons/lines/LineGeometry.js';
+        import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
+        import exifr from '/exifr.mjs';
+
+        // ==================== 全局配置 ====================
+        const CONFIG = {
+            radius: 280,
+            // 粒子总数为1.5倍(240000)，缩小时只显示67%，放大时全部显示
+            targetLand: 240000, targetOcean: 70000, totalSamples: 850000,
+            particleBaseSize: 2.6,
+            mapUrl: 'https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/planets/earth_specular_2048.jpg',
+            fontUrl: 'https://unpkg.com/three@0.160.0/examples/fonts/helvetiker_bold.typeface.json',
+            colors: {
+                land: [new THREE.Color(0xffffff), new THREE.Color(0xfff0c0), new THREE.Color(0xe0d0f0)],
+                ocean: new THREE.Color(0xd0c8e8),
+                borderLine: new THREE.Color(0x6B4D7E),
+                marker: new THREE.Color(0xFF6B6B)
+            },
+            labels: [
+                { cn:'亚 洲', en:'ASIA', lat:35, lon:100 },
+                { cn:'欧 洲', en:'EUROPE', lat:48, lon:15 },
+                { cn:'非 洲', en:'AFRICA', lat:5, lon:20 },
+                { cn:'北美洲', en:'NORTH AMERICA', lat:40, lon:-100 },
+                { cn:'南美洲', en:'SOUTH AMERICA', lat:-15, lon:-60 },
+                { cn:'大洋洲', en:'OCEANIA', lat:-25, lon:135 }
+            ]
+        };
+
+        // ==================== 全局变量 ====================
+        let scene, camera, renderer, earthGroup, loadedFont;
+        let isDragging = false, hasDragged = false;
+        let previousMousePosition = { x:0, y:0 };
+        let targetRotationX = 0.3, targetRotationY = 4.2;
+        let raycaster, mouse, clickSphere;
+        let GEO_DATA = null;
+        let recordsMarkers = [];          // 旅行记录信箱Sprite列表
+        let planMarkers = [];              // 旅行计划红色邮箱Sprite列表
+        let awaitingLocationClick = false;
+        let continentLabels = [], countryLabels = [];
+        let borderLineMaterials = [];
+        let highlightBorderGroup = null; // 高亮国境线容器
+        let hoveredFeatureIndex = null;  // 当前悬停的国家 feature 索引
+        const ZOOM_THRESHOLD = 600;
+        let currentMouseLat = null;
+        let particleMaterial = null;       // 粒子ShaderMaterial（控制亮度+额外粒子可见性）
+        let currentDetailGroup = null;     // 当前打开详情的Sprite
+        let currentDetailType = 'record';  // 当前详情类型 'record' | 'plan'
+        let mailboxTexture = null;         // 旅行记录邮箱纹理
+        let planMailboxTexture = null;     // 旅行计划红色邮箱纹理
+        let formMode = 'record';           // 表单模式 'record' | 'plan'
+
+        // 国家中文名映射
+        const ZH={China:'中国','United States of America':'美国',Russia:'俄罗斯',Japan:'日本','United Kingdom':'英国',France:'法国',Germany:'德国',Italy:'意大利',Spain:'西班牙',Canada:'加拿大',India:'印度',Brazil:'巴西',Australia:'澳大利亚',Mexico:'墨西哥','South Korea':'韩国',Turkey:'土耳其',Egypt:'埃及',Iran:'伊朗','Saudi Arabia':'沙特阿拉伯',Indonesia:'印度尼西亚',Poland:'波兰',Ukraine:'乌克兰',Thailand:'泰国',Vietnam:'越南','South Africa':'南非',Argentina:'阿根廷',Netherlands:'荷兰',Sweden:'瑞典',Norway:'挪威',Finland:'芬兰',Iceland:'冰岛',Greece:'希腊',Portugal:'葡萄牙',Romania:'罗马尼亚',Czechia:'捷克',Belgium:'比利时',Switzerland:'瑞士',Austria:'奥地利',Hungary:'匈牙利',Denmark:'丹麦',Ireland:'爱尔兰','New Zealand':'新西兰',Israel:'以色列',Morocco:'摩洛哥',Mongolia:'蒙古',Belarus:'白俄罗斯',Estonia:'爱沙尼亚',Latvia:'拉脱维亚',Lithuania:'立陶宛',Kazakhstan:'哈萨克斯坦',Pakistan:'巴基斯坦',Bangladesh:'孟加拉国',Philippines:'菲律宾',Malaysia:'马来西亚',Colombia:'哥伦比亚',Chile:'智利',Peru:'秘鲁',Venezuela:'委内瑞拉',Nigeria:'尼日利亚',Kenya:'肯尼亚',Iraq:'伊拉克',Syria:'叙利亚',Jordan:'约旦',Lebanon:'黎巴嫩','United Arab Emirates':'阿联酋',Cuba:'古巴',Algeria:'阿尔及利亚',Libya:'利比亚',Sudan:'苏丹',Tanzania:'坦桑尼亚','Dem. Rep. Congo':'刚果(金)',Madagascar:'马达加斯加',Myanmar:'缅甸',Nepal:'尼泊尔',Afghanistan:'阿富汗',Greenland:'格陵兰',Angola:'安哥拉',Mozambique:'莫桑比克',Zambia:'赞比亚',Zimbabwe:'津巴布韦',Botswana:'博茨瓦纳',Namibia:'纳米比亚',Somalia:'索马里',Ethiopia:'埃塞俄比亚',Ghana:'加纳',Cameroon:'喀麦隆',Uzbekistan:'乌兹别克斯坦',Turkmenistan:'土库曼斯坦',Bolivia:'玻利维亚',Paraguay:'巴拉圭',Uruguay:'乌拉圭',Ecuador:'厄瓜多尔','Papua New Guinea':'巴布亚新几内亚',Cambodia:'柬埔寨',Laos:'老挝',Cyprus:'塞浦路斯',Georgia:'格鲁吉亚',Armenia:'亚美尼亚',Azerbaijan:'阿塞拜疆',Fiji:'斐济',Kuwait:'科威特',Qatar:'卡塔尔',Oman:'阿曼',Yemen:'也门',Bhutan:'不丹','Sri Lanka':'斯里兰卡',Taiwan:'台湾','North Korea':'朝鲜',Croatia:'克罗地亚','Bosnia and Herz.':'波黑',Serbia:'塞尔维亚',Bulgaria:'保加利亚',Albania:'阿尔巴尼亚','North Macedonia':'北马其顿',Montenegro:'黑山',Kosovo:'科索沃',Moldova:'摩尔多瓦',Slovakia:'斯洛伐克',Slovenia:'斯洛文尼亚',Luxembourg:'卢森堡','W. Sahara':'西撒哈拉',Tunisia:'突尼斯',Mali:'马里',Niger:'尼日尔',Chad:'乍得',Congo:'刚果(布)',Gabon:'加蓬',Uganda:'乌干达',Rwanda:'卢旺达',Senegal:'塞内加尔',Liberia:'利比里亚','Burkina Faso':'布基纳法索',Benin:'贝宁',Togo:'多哥','S. Sudan':'南苏丹',Mauritania:'毛里塔尼亚',Palestine:'巴勒斯坦',Haiti:'海地','Dominican Rep.':'多米尼加','Costa Rica':'哥斯达黎加',Panama:'巴拿马',Nicaragua:'尼加拉瓜',Honduras:'洪都拉斯',Guatemala:'危地马拉',Belize:'伯利兹',Jamaica:'牙买加','Puerto Rico':'波多黎各'};
+
+        // 天气代码映射
+        const WEATHER_DESC = {0:'☀️ 晴',1:'🌤 少云',2:'⛅ 多云',3:'☁️ 阴',45:'🌫 雾',48:'🌫 浓雾',51:'🌦 小雨',53:'🌦 中雨',55:'🌦 大雨',61:'🌧 小雨',63:'🌧 中雨',65:'🌧 大雨',71:'🌨 小雪',73:'🌨 中雪',75:'🌨 大雪',80:'🌦 阵雨',81:'🌦 阵雨',82:'🌦 强阵雨',95:'⛈ 雷暴',96:'⛈ 冰雹',99:'⛈ 冰雹'};
+        function getWeatherDesc(code) { return WEATHER_DESC[code] || ('天气代码 ' + code); }
+
+        // ==================== 加载邮箱纹理（去除深蓝背景） ====================
+        function loadMailboxTex() {
+            return new Promise(resolve => {
+                const img = new Image();
+                img.crossOrigin = 'anonymous';
+                img.onload = () => {
+                    const c = document.createElement('canvas');
+                    c.width = img.width; c.height = img.height;
+                    const ctx = c.getContext('2d');
+                    // 水平镜像翻转邮箱图片
+                    ctx.translate(c.width, 0);
+                    ctx.scale(-1, 1);
+                    ctx.drawImage(img, 0, 0);
+                    ctx.setTransform(1, 0, 0, 1, 0, 0); // 重置变换
+                    const data = ctx.getImageData(0, 0, c.width, c.height);
+                    const d = data.data;
+                    // 去除深蓝色背景 (约 rgb(26,42,90))
+                    for (let i = 0; i < d.length; i += 4) {
+                        const r = d[i], g = d[i+1], b = d[i+2];
+                        const dr = r - 26, dg = g - 42, db = b - 90;
+                        const dist = Math.sqrt(dr*dr + dg*dg + db*db);
+                        if (dist < 55) { d[i+3] = 0; }
+                        else if (dist < 75) { d[i+3] = Math.round(255 * (dist - 55) / 20); }
+                    }
+                    ctx.putImageData(data, 0, 0);
+                    // 叠加冷暖光照方向（左冷右暖）
+                    const grad = ctx.createLinearGradient(0, 0, c.width, 0);
+                    grad.addColorStop(0, 'rgba(180,210,255,0.06)');
+                    grad.addColorStop(1, 'rgba(255,200,150,0.05)');
+                    ctx.globalCompositeOperation = 'overlay';
+                    ctx.fillStyle = grad;
+                    ctx.fillRect(0, 0, c.width, c.height);
+                    ctx.globalCompositeOperation = 'source-over';
+                    resolve(new THREE.CanvasTexture(c));
+                };
+                img.onerror = () => resolve(null);
+                img.src = '/mailbox.jpg';
+            });
+        }
+
+        // 加载红色邮箱纹理（旅行计划用，PNG已去背景）
+        function loadPlanMailboxTex() {
+            return new Promise(resolve => {
+                const img = new Image();
+                img.crossOrigin = 'anonymous';
+                img.onload = () => {
+                    const c = document.createElement('canvas');
+                    c.width = img.width; c.height = img.height;
+                    const ctx = c.getContext('2d');
+                    ctx.drawImage(img, 0, 0);
+                    resolve(new THREE.CanvasTexture(c));
+                };
+                img.onerror = () => resolve(null);
+                img.src = '/mailbox-plan.png';
+            });
+        }
+
+        // ==================== 启动 ====================
+        loadResources();
+
+        async function loadResources() {
+            const manager = new THREE.LoadingManager();
+            manager.onLoad = () => init();
+            try { const r = await fetch('/ne_110m_admin_0_countries.geojson'); GEO_DATA = await r.json(); } catch(e) { console.warn('GeoJSON fail',e); }
+            try { mailboxTexture = await loadMailboxTex(); } catch(e) { console.warn('Mailbox texture fail',e); }
+            try { planMailboxTexture = await loadPlanMailboxTex(); } catch(e) { console.warn('Plan mailbox texture fail',e); }
+            new FontLoader(manager).load(CONFIG.fontUrl, f => { loadedFont = f; });
+            const il = new THREE.ImageLoader(manager); il.setCrossOrigin('Anonymous');
+            il.load(CONFIG.mapUrl, img => processMapData(img));
+        }
+
+        let mapPixelData, mapWidth, mapHeight;
+        function processMapData(image) {
+            const c = document.createElement('canvas'); c.width=image.width; c.height=image.height;
+            const x = c.getContext('2d'); x.drawImage(image,0,0);
+            const d = x.getImageData(0,0,c.width,c.height);
+            mapPixelData=d.data; mapWidth=c.width; mapHeight=c.height;
+        }
+
+        // ==================== 初始化场景 ====================
+        function init() {
+            scene = new THREE.Scene();
+            scene.fog = new THREE.FogExp2(0x7a6a8a, 0.0007);
+            camera = new THREE.PerspectiveCamera(45, innerWidth/innerHeight, 1, 3000);
+            camera.position.set(0,0,900);
+            renderer = new THREE.WebGLRenderer({ antialias:true, alpha:true });
+            renderer.setSize(innerWidth, innerHeight);
+            renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
+            document.body.appendChild(renderer.domElement);
+
+            createEarthSystem();
+            createCanvasLabels();
+            createCountryLabels();
+            if (GEO_DATA) createBordersFromLocalData();
+
+            const sg = new THREE.SphereGeometry(CONFIG.radius+5,64,64);
+            clickSphere = new THREE.Mesh(sg, new THREE.MeshBasicMaterial({visible:false}));
+            earthGroup.add(clickSphere);
+            raycaster = new THREE.Raycaster();
+            mouse = new THREE.Vector2();
+
+            // ====== 灯光：亮部偏冷、暗部偏暖 ======
+            scene.add(new THREE.AmbientLight(0xffe8d0, 0.35)); // 暖色环境光（暗部基调）
+            const keyLight = new THREE.DirectionalLight(0xd0e8ff, 1.0); // 冷色主光源（亮部偏冷）
+            keyLight.position.set(-2, 1, 1);
+            scene.add(keyLight);
+            const fillLight = new THREE.DirectionalLight(0xffe0c0, 0.4); // 暖色补光（暗部偏暖）
+            fillLight.position.set(2, -0.5, 0.5);
+            scene.add(fillLight);
+
+            // 事件绑定
+            document.addEventListener('mousedown', onMouseDown);
+            document.addEventListener('mousemove', onMouseMove);
+            document.addEventListener('mouseup', onMouseUp);
+            document.addEventListener('contextmenu', onContextMenu); // 右键选位
+            document.addEventListener('wheel', onMouseWheel);
+            // 触摸事件（移动端）
+            document.addEventListener('touchstart', onTouchStart, {passive:false});
+            document.addEventListener('touchmove', onTouchMove, {passive:false});
+            document.addEventListener('touchend', onTouchEnd);
+            addEventListener('resize', onWindowResize);
+            document.getElementById('btn-cancel').addEventListener('click', hideForm);
+            document.getElementById('form-overlay').addEventListener('wheel', e => { e.stopPropagation(); }, {passive:false});
+            document.getElementById('btn-save').addEventListener('click', onSaveRecord);
+            document.getElementById('btn-add-record').addEventListener('click', onAddRecordClick);
+            document.getElementById('btn-add-plan').addEventListener('click', onAddPlanClick);
+            document.getElementById('detail-close').addEventListener('click', closeDetail);
+            // 不再点击遮罩关闭，只能点X关闭
+            // 阻止信封弹窗内的滚轮事件穿透到地球
+            document.getElementById('detail-overlay').addEventListener('wheel', e => { e.stopPropagation(); }, {passive:false});
+            document.getElementById('detail-delete').addEventListener('click', deleteCurrentRecord);
+            document.getElementById('image-input').addEventListener('change', onImageSelected);
+            // AI 聊天相关事件
+            document.getElementById('btn-voice').addEventListener('click', () => {
+                if (isRecording) stopAndSendVoice(); else startRecording();
+            });
+            document.getElementById('btn-stop-voice').addEventListener('click', () => {
+                stopAndSendVoice();
+            });
+            document.getElementById('btn-chat-send').addEventListener('click', () => {
+                const text = document.getElementById('chat-text-input').value.trim();
+                if (text) sendChatMessage(text);
+            });
+            document.getElementById('chat-text-input').addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    const text = e.target.value.trim();
+                    if (text) sendChatMessage(text);
+                }
+            });
+            // 查看完整对话按钮
+            document.getElementById('btn-view-chat').addEventListener('click', showChatLog);
+            // 继续聊天按钮
+            document.getElementById('btn-continue-chat').addEventListener('click', onContinueChat);
+            document.getElementById('chat-log-close').addEventListener('click', () => {
+                document.getElementById('chat-log-modal').style.display = 'none';
+            });
+            // 初始化语音识别
+            initSpeechRecognition();
+            // 表单内"地图定位"按钮
+            document.getElementById('btn-map-locate').addEventListener('click', enterPickMode);
+            document.getElementById('btn-city-search').addEventListener('click', onCitySearch);
+            document.getElementById('city-search-input').addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    onCitySearch();
+                }
+            });
+            // 选位提示取消按钮
+            document.getElementById('pick-hint-cancel').addEventListener('click', cancelLocationMode);
+            // 定位确认卡片按钮
+            document.getElementById('loc-ok').addEventListener('click', confirmLocation);
+            document.getElementById('loc-cancel').addEventListener('click', ()=>{ hideLocConfirm(); /* 留在选位模式，可以重新选 */ });
+
+            loadRecords();
+            loadPlans();
+            animate();
+        }
+
+        // ==================== 坐标转换 ====================
+        function latLonToVector3(lat, lon, radius) {
+            const phi = (90-lat)*(Math.PI/180), theta = (180-lon+90)*(Math.PI/180);
+            return new THREE.Vector3(radius*Math.sin(phi)*Math.cos(theta), radius*Math.cos(phi), radius*Math.sin(phi)*Math.sin(theta));
+        }
+        function vector3ToLatLon(v) {
+            const r=v.length()||CONFIG.radius+5;
+            const phi=Math.acos(Math.max(-1,Math.min(1,v.y/r))), theta=Math.atan2(v.z,v.x);
+            let lat=90-phi*(180/Math.PI), lon=270-theta*(180/Math.PI);
+            if(lon>180) lon-=360; if(lon<-180) lon+=360;
+            return {lat,lon};
+        }
+
+        // ==================== 粒子地球（1.5倍粒子 + brightness + showExtra） ====================
+        function createEarthSystem() {
+            earthGroup = new THREE.Group();
+            scene.add(earthGroup);
+            const geometry = new THREE.BufferGeometry();
+            const positions=[], colors=[], sizes=[], rands=[];
+            let landCount=0;
+            for(let i=0;i<CONFIG.totalSamples;i++){
+                const phi=Math.acos(-1+(2*i)/CONFIG.totalSamples);
+                const theta=Math.sqrt(CONFIG.totalSamples*Math.PI)*phi;
+                const v=1-(phi/Math.PI), u=(theta/(2*Math.PI))%1;
+                let nu=(1-u+.25)%1; if(nu<0) nu+=1;
+                const xP=Math.floor(nu*mapWidth), yP=Math.floor((1-v)*mapHeight);
+                const idx=(yP*mapWidth+xP)*4;
+                if(mapPixelData[idx]>=50) continue;
+                if(landCount>=CONFIG.targetLand) continue;
+                landCount++;
+                let r=CONFIG.radius+Math.random()*5;
+                positions.push(r*Math.sin(phi)*Math.cos(theta), r*Math.cos(phi), r*Math.sin(phi)*Math.sin(theta));
+                const rnd=Math.random();
+                let c=rnd>.5?CONFIG.colors.land[0]:rnd>.2?CONFIG.colors.land[1]:CONFIG.colors.land[2];
+                colors.push(c.r,c.g,c.b);
+                sizes.push(CONFIG.particleBaseSize*(0.6+Math.random()*1.4));
+                rands.push(Math.random()); // 随机值，用于决定是否为"额外"粒子
+            }
+            for(let la=-84;la<=84&&positions.length/3-landCount<CONFIG.targetOcean;la+=2.5){
+                for(let lo=-177;lo<=177&&positions.length/3-landCount<CONFIG.targetOcean;lo+=3){
+                    const phi=(90-la)*(Math.PI/180), theta=(180-lo+90)*(Math.PI/180);
+                    const v=1-(phi/Math.PI), u=(theta/(2*Math.PI))%1;
+                    let nu=(1-u+.25)%1; if(nu<0)nu+=1;
+                    const xP=Math.floor(nu*mapWidth), yP=Math.floor((1-v)*mapHeight);
+                    if(mapPixelData[(yP*mapWidth+xP)*4]<50) continue;
+                    const r=CONFIG.radius+Math.random();
+                    positions.push(r*Math.sin(phi)*Math.cos(theta), r*Math.cos(phi), r*Math.sin(phi)*Math.sin(theta));
+                    colors.push(CONFIG.colors.ocean.r, CONFIG.colors.ocean.g, CONFIG.colors.ocean.b);
+                    sizes.push(CONFIG.particleBaseSize*1.0);
+                    rands.push(-1.0); // 负值标记海洋粒子
+                }
+            }
+            geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions,3));
+            geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors,3));
+            geometry.setAttribute('size', new THREE.Float32BufferAttribute(sizes,1));
+            geometry.setAttribute('rand', new THREE.Float32BufferAttribute(rands,1));
+
+            const material = new THREE.ShaderMaterial({
+                uniforms:{
+                    pointTexture:{value:createHotGlowTexture()},
+                    brightness:{value:1.0},
+                    showExtra:{value:0.0}  // 0=只显示67%粒子, 1=全部显示
+                },
+                vertexShader:`
+                    attribute float size; attribute vec3 color; attribute float rand;
+                    varying vec3 vColor; varying float vDotNV; varying float vRand;
+                    void main(){
+                        vColor=color; vRand=rand;
+                        vec4 mv=modelViewMatrix*vec4(position,1.0);
+                        gl_PointSize=size*(800.0/-mv.z);
+                        gl_Position=projectionMatrix*mv;
+                        vec3 vd=normalize(-mv.xyz);
+                        vec3 tn=normalize(normalMatrix*normalize(position));
+                        vDotNV=dot(tn,vd);
+                    }`,
+                fragmentShader:`
+                    uniform sampler2D pointTexture; uniform float brightness; uniform float showExtra;
+                    varying vec3 vColor; varying float vDotNV; varying float vRand;
+                    void main(){
+                        float extraAlpha = 1.0;
+                        if(vRand < 0.0) {
+                            // 海洋粒子：缩小时可见，放大时隐藏
+                            extraAlpha = 1.0 - smoothstep(0.0, 1.0, showExtra);
+                        } else if(vRand > 0.67) {
+                            // 额外陆地粒子：放大时才显示
+                            extraAlpha = smoothstep(0.0, 1.0, showExtra);
+                        }
+                        float d=mix(0.4,1.4,smoothstep(-0.2,0.7,vDotNV));
+                        // 海洋粒子：边缘更亮，加强球体体积感（菲涅尔边缘光）
+                        float rim = 1.0 - smoothstep(0.0, 0.8, vDotNV); // 边缘=1, 中心=0
+                        float oceanD = mix(1.2, 2.5, rim); // 中心1.2，边缘2.5，增强体积感
+                        float finalD = vRand < 0.0 ? oceanD : d;
+                        vec4 t=texture2D(pointTexture,gl_PointCoord);
+                        if(t.a<0.1) discard;
+                        gl_FragColor=vec4(vColor*finalD*2.0*brightness,1.0)*t;
+                        gl_FragColor.a=t.a*(0.6+0.4*finalD)*extraAlpha;
+                        if(gl_FragColor.a < 0.01) discard;
+                    }`,
+                blending:THREE.AdditiveBlending, depthTest:false, transparent:true
+            });
+            particleMaterial = material;
+            earthGroup.add(new THREE.Points(geometry, material));
+            earthGroup.position.y = -CONFIG.radius*0.6;
+            earthGroup.rotation.x = targetRotationX;
+            earthGroup.rotation.y = targetRotationY;
+        }
+
+        // ==================== 国境线 ====================
+        function createBordersFromLocalData() {
+            const mat = new LineMaterial({color:0x6B4D7E, linewidth:1, worldUnits:true, transparent:true, opacity:1, resolution:new THREE.Vector2(innerWidth,innerHeight)});
+            borderLineMaterials = [mat];
+            highlightBorderGroup = new THREE.Group();
+            earthGroup.add(highlightBorderGroup);
+            GEO_DATA.features.forEach(f => {
+                let polys = f.geometry.type==='Polygon'?[f.geometry.coordinates]:f.geometry.coordinates;
+                polys.forEach(poly => {
+                    const ring=poly[0];
+                    const pts=ring.map(c=>latLonToVector3(c[1],c[0],CONFIG.radius+2));
+                    const curve=new THREE.CatmullRomCurve3(pts,true,'catmullrom',0.5);
+                    const sp=curve.getPoints(Math.min(ring.length*2,120));
+                    const g=new LineGeometry(); g.setPositions(sp.flatMap(p=>[p.x,p.y,p.z]));
+                    earthGroup.add(new Line2(g, mat));
+                });
+            });
+        }
+        // 设置悬停国家的高亮（边界线 + 标签强调）
+        function setCountryHover(featureIndex) {
+            if (featureIndex === hoveredFeatureIndex) return;
+            if (!GEO_DATA || !highlightBorderGroup) return;
+            const prev = hoveredFeatureIndex;
+            hoveredFeatureIndex = featureIndex;
+            // 取消上一个标签的强调
+            countryLabels.forEach(sp => {
+                if (sp.userData.featureIndex === prev && sp.userData.baseScale) {
+                    const s = sp.userData.baseScale;
+                    sp.scale.set(s[0], s[1], 1);
+                }
+            });
+            // 清除高亮边界
+            while (highlightBorderGroup.children.length) highlightBorderGroup.remove(highlightBorderGroup.children[0]);
+            if (featureIndex == null) return;
+            // 高亮边界线：原地图色 0x6B4D7E，内实外虚（主线实心+1.5px 细辉光）
+            const f = GEO_DATA.features[featureIndex];
+            const baseR = CONFIG.radius + 2.5;
+            const lineColor = 0x6B4D7E; // 与地图国境线一致
+            let polys = f.geometry.type==='Polygon'?[f.geometry.coordinates]:f.geometry.coordinates;
+            polys.forEach(poly => {
+                const ring=poly[0];
+                const pts=ring.map(c=>latLonToVector3(c[1],c[0],baseR));
+                const curve=new THREE.CatmullRomCurve3(pts,true,'catmullrom',0.5);
+                const sp=curve.getPoints(Math.min(ring.length*2,120));
+                const g=new LineGeometry(); g.setPositions(sp.flatMap(p=>[p.x,p.y,p.z]));
+                // 外圈虚：1.5px 细辉光，半透明
+                const glowMat = new LineMaterial({color:lineColor, linewidth:1.5, worldUnits:true, transparent:true, opacity:0.38, resolution:new THREE.Vector2(innerWidth,innerHeight)});
+                highlightBorderGroup.add(new Line2(g.clone(), glowMat));
+                // 内芯实：略粗于默认，不透明
+                const mainMat = new LineMaterial({color:lineColor, linewidth:1.15, worldUnits:true, transparent:true, opacity:1, resolution:new THREE.Vector2(innerWidth,innerHeight)});
+                highlightBorderGroup.add(new Line2(g, mainMat));
+            });
+            // 强调对应国家标签（放大 1.2 倍）
+            countryLabels.forEach(sp => {
+                if (sp.userData.featureIndex === featureIndex && sp.userData.baseScale) {
+                    const s = sp.userData.baseScale;
+                    sp.scale.set(s[0]*1.2, s[1]*1.2, 1);
+                }
+            });
+        }
+
+        // ==================== 洲名标签（修正朝向：正交基让文字保持水平） ====================
+        function createCanvasLabels() {
+            CONFIG.labels.forEach(data => {
+                const pos = latLonToVector3(data.lat, data.lon, CONFIG.radius+20);
+                const c = document.createElement('canvas'); c.width=1024; c.height=512;
+                const x = c.getContext('2d');
+                x.textAlign='center';
+                x.shadowColor='rgba(255,255,255,0.8)'; x.shadowBlur=40;
+                x.font="bold 130px 'Microsoft YaHei','Heiti SC',sans-serif";
+                x.fillStyle='rgba(255,255,255,0.5)';
+                x.fillText(data.cn, 512, 205);
+                x.shadowColor='rgba(255,255,255,0.6)'; x.shadowBlur=20;
+                x.fillStyle='#ffffff';
+                x.fillText(data.cn, 512, 205);
+                x.font="bold 50px 'Arial',sans-serif";
+                x.fillStyle='rgba(255,255,255,0.95)';
+                x.fillText(data.en, 512, 285);
+
+                const tex = new THREE.CanvasTexture(c);
+                const mat = new THREE.MeshBasicMaterial({
+                    map:tex, transparent:true, depthTest:false, depthWrite:false,
+                    side:THREE.DoubleSide
+                });
+                const planeGeom = new THREE.PlaneGeometry(120, 60);
+                const mesh = new THREE.Mesh(planeGeom, mat);
+                mesh.position.copy(pos);
+
+                // 用正交基构建旋转：法线朝外 + "上"方向对齐纬线方向
+                const normal = pos.clone().normalize();
+                let worldUp = new THREE.Vector3(0, 1, 0);
+                // 极点附近用别的参考向量
+                if (Math.abs(normal.y) > 0.95) worldUp.set(0, 0, 1);
+                const right = new THREE.Vector3().crossVectors(worldUp, normal).normalize();
+                const up = new THREE.Vector3().crossVectors(normal, right).normalize();
+                const rotMat = new THREE.Matrix4().makeBasis(right, up, normal);
+                mesh.quaternion.setFromRotationMatrix(rotMat);
+
+                mesh.userData.type = 'continent';
+                earthGroup.add(mesh);
+                continentLabels.push(mesh);
+            });
+        }
+
+        // ==================== 国家名标签 ====================
+        function estimateCountrySize(f) {
+            let t=0; const cs=f.geometry.type==='Polygon'?[f.geometry.coordinates]:f.geometry.coordinates;
+            cs.forEach(p=>p.forEach(r=>{t+=r.length;})); return t;
+        }
+        // 部分国家几何中心偏移，使用人工校正坐标（主领土）
+        const COUNTRY_LABEL_OVERRIDE = { 'France':[46.5,2.2], 'United States of America':[39.8,-98.5], 'Russia':[55.8,49.2] };
+        function createCountryLabels() {
+            if(!GEO_DATA) return;
+            GEO_DATA.features.forEach((feature, fi) => {
+                const name=feature.properties?.NAME||feature.properties?.ADMIN||'';
+                if(!name) return;
+                const nameZh=ZH[name]||'';
+                let lat, lon;
+                const ov = COUNTRY_LABEL_OVERRIDE[name];
+                if (ov) { lat=ov[0]; lon=ov[1]; } else {
+                    const geom=feature.geometry;
+                    let coords=geom.type==='Polygon'?[geom.coordinates[0]]:geom.type==='MultiPolygon'?geom.coordinates.map(c=>c[0]):[];
+                    if(!coords.length) return;
+                    let sLat=0,sLon=0,n=0;
+                    coords.forEach(r=>r.forEach(c=>{sLon+=c[0];sLat+=c[1];n++;}));
+                    lat=sLat/n; lon=sLon/n;
+                }
+                const sz=estimateCountrySize(feature);
+                let fontSize, spriteScale;
+                if(sz>200){fontSize=50;spriteScale=[91,18,1];}
+                else if(sz>60){fontSize=36;spriteScale=[72,14,1];}
+                else{fontSize=29;spriteScale=[58,12,1];}
+                const pos=latLonToVector3(lat,lon,CONFIG.radius+6);
+                const c=document.createElement('canvas'); c.width=512; c.height=110;
+                const ctx=c.getContext('2d');
+                ctx.textAlign='center';
+                ctx.shadowColor='transparent'; ctx.shadowBlur=0;
+                ctx.strokeStyle='rgba(80,30,30,0.6)'; ctx.lineWidth=3; ctx.lineJoin='round';
+                ctx.fillStyle='#FFF5F5';
+                const l1=nameZh||name, l2=nameZh?name:'';
+                ctx.font=`900 ${fontSize}px 'Microsoft YaHei','Heiti SC',sans-serif`;
+                ctx.strokeText(l1,256,l2?42:60); ctx.fillText(l1,256,l2?42:60);
+                if(l2){
+                    const es=Math.round(fontSize*.55);
+                    ctx.font=`800 ${es}px 'Arial',sans-serif`;
+                    ctx.strokeText(l2,256,75); ctx.fillText(l2,256,75);
+                }
+                const tex=new THREE.CanvasTexture(c);
+                const mat=new THREE.SpriteMaterial({map:tex,transparent:true,depthTest:false});
+                const sp=new THREE.Sprite(mat); sp.position.copy(pos);
+                sp.scale.set(...spriteScale); sp.visible=false; sp.userData.type='country'; sp.userData.featureIndex=fi; sp.userData.baseScale=[...spriteScale];
+                earthGroup.add(sp); countryLabels.push(sp);
+            });
+        }
+
+        // ==================== 粒子发光纹理 ====================
+        function createHotGlowTexture() {
+            const c=document.createElement('canvas'); c.width=64;c.height=64;
+            const x=c.getContext('2d');
+            const g=x.createRadialGradient(32,32,0,32,32,32);
+            g.addColorStop(0,'rgba(255,255,255,1)');
+            g.addColorStop(.2,'rgba(240,235,255,.9)');
+            g.addColorStop(.6,'rgba(0,0,0,0)');
+            x.fillStyle=g; x.fillRect(0,0,64,64);
+            return new THREE.CanvasTexture(c);
+        }
+
+        // ==================== 邮箱标记（使用实际邮箱图片作为Sprite） ====================
+        function createMailboxSprite(lat, lon, record) {
+            if (!mailboxTexture) return null;
+            const mat = new THREE.SpriteMaterial({map:mailboxTexture, transparent:true, depthTest:false});
+            const sp = new THREE.Sprite(mat);
+            const pos = latLonToVector3(lat, lon, CONFIG.radius + 10);
+            sp.position.copy(pos);
+            sp.scale.set(8, 12, 1); // 约为原来的一半大小
+            sp.userData = { type:'marker', record: record || {} };
+            earthGroup.add(sp);
+            recordsMarkers.push(sp);
+            return sp;
+        }
+
+        // ==================== 旅行计划标记（红色邮箱Sprite） ====================
+        function createPlanSprite(lat, lon, plan) {
+            if (!planMailboxTexture) return null;
+            const mat = new THREE.SpriteMaterial({map:planMailboxTexture, transparent:true, depthTest:false});
+            const sp = new THREE.Sprite(mat);
+            const pos = latLonToVector3(lat, lon, CONFIG.radius + 10);
+            sp.position.copy(pos);
+            sp.scale.set(10, 14, 1);
+            sp.userData = { type:'plan-marker', plan: plan || {} };
+            earthGroup.add(sp);
+            planMarkers.push(sp);
+            return sp;
+        }
+
+        // 圆角矩形辅助
+        function roundRect(ctx,x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.lineTo(x+w-r,y);ctx.quadraticCurveTo(x+w,y,x+w,y+r);ctx.lineTo(x+w,y+h-r);ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);ctx.lineTo(x+r,y+h);ctx.quadraticCurveTo(x,y+h,x,y+h-r);ctx.lineTo(x,y+r);ctx.quadraticCurveTo(x,y,x+r,y);ctx.closePath();}
+
+        // ==================== 纬度轴 ====================
+        function drawLatAxis() {
+            const cv = document.getElementById('lat-canvas');
+            // 让纬度轴与球体缩放保持同趋势：地球越放大（z越小），轴越长
+            const zoomScale = Math.max(0.75, Math.min(1.85, 900 / camera.position.z));
+            const h = Math.min(innerHeight - 40, Math.max(260, Math.round(340 * zoomScale)));
+            cv.height = h; cv.width = 65;
+            const ctx = cv.getContext('2d');
+            ctx.clearRect(0, 0, 65, h);
+            const minLat = -90, maxLat = 90;
+            const margin = 15;
+            const barH = h - margin * 2;
+            const rectW = 8, rectH = 2, gap = 2.5;
+            const count = Math.floor(barH / (rectH + gap));
+            const centerX = 22;
+
+            for (let i = 0; i < count; i++) {
+                const y = margin + i * (rectH + gap);
+                const lat = maxLat - (i / (count - 1)) * (maxLat - minLat);
+                const nearMouse = currentMouseLat !== null && Math.abs(lat - currentMouseLat) < 2.5;
+                if (nearMouse) {
+                    ctx.fillStyle = '#FAEB92';
+                    roundRect(ctx, centerX - rectW * 0.7, y - 0.5, rectW * 1.4, rectH + 1, 1.5);
+                } else {
+                    ctx.fillStyle = 'rgba(250,235,146,0.25)';
+                    roundRect(ctx, centerX - rectW / 2, y, rectW, rectH, 1);
+                }
+                ctx.fill();
+            }
+            ctx.font = '9px Arial'; ctx.textAlign = 'left';
+            for (let lat = -90; lat <= 90; lat += 15) {
+                const y = margin + ((maxLat - lat) / (maxLat - minLat)) * barH;
+                ctx.fillStyle = 'rgba(250,235,146,0.5)';
+                ctx.fillText(lat + '°', centerX + rectW + 4, y + 3);
+            }
+            if (currentMouseLat !== null) {
+                const y = margin + ((maxLat - currentMouseLat) / (maxLat - minLat)) * barH;
+                if (y >= margin && y <= margin + barH) {
+                    ctx.fillStyle = '#FAEB92';
+                    ctx.beginPath();
+                    ctx.moveTo(centerX - rectW - 2, y);
+                    ctx.lineTo(centerX - rectW - 8, y - 4);
+                    ctx.lineTo(centerX - rectW - 8, y + 4);
+                    ctx.closePath(); ctx.fill();
+                    ctx.font = 'bold 11px Arial'; ctx.textAlign = 'left';
+                    ctx.fillText(currentMouseLat.toFixed(1) + '°', centerX + rectW + 4, y - 6);
+                }
+            }
+        }
+
+        // ==================== EXIF GPS（遍历多张图片，找到第一张含GPS的） ====================
+        async function onImageSelected(e) {
+            const files = e.target.files;
+            const hint = document.getElementById('gps-hint');
+            const countEl = document.getElementById('image-count');
+            if(!files || files.length === 0) { hint.textContent=''; countEl.textContent=''; return; }
+            countEl.textContent = `已选择 ${files.length} 张图片`;
+            // 遍历所有文件，找第一张含GPS的，同时读取拍摄日期
+            let gpsFound = false;
+            let dateFound = false;
+            for(let i = 0; i < files.length; i++) {
+                try {
+                    const gps = await exifr.gps(files[i]);
+                    if(!gpsFound && gps && gps.latitude != null && gps.longitude != null) {
+                        pendingRecord = { lat: gps.latitude, lon: gps.longitude };
+                        // 先用本地 GeoJSON 快速显示国家
+                        const geo = reverseGeocode(gps.latitude, gps.longitude);
+                        let label = geo.nameZh ? `${geo.nameZh}（${geo.name}）` : (geo.name || '');
+                        let coordText = `经纬度：${gps.latitude.toFixed(4)}°, ${gps.longitude.toFixed(4)}°（从第${i+1}张照片GPS读取）`;
+                        if(label) coordText += ` · ${label}`;
+                        document.getElementById('coord-display').textContent = coordText;
+                        hint.textContent = `✓ 已从第${i+1}张照片中读取GPS坐标`; hint.style.color = '#4a9';
+                        gpsFound = true;
+                        // 异步调用后端获取详细城市信息
+                        fetch(`/api/reverse-geocode?lat=${gps.latitude}&lon=${gps.longitude}`)
+                            .then(r => r.json())
+                            .then(d => {
+                                if(d.success && d.displayName) {
+                                    const coordEl = document.getElementById('coord-display');
+                                    coordEl.textContent = `经纬度：${gps.latitude.toFixed(4)}°, ${gps.longitude.toFixed(4)}°（从第${i+1}张照片GPS读取） · ${d.displayName}`;
+                                }
+                            }).catch(()=>{});
+                    }
+                } catch(err) { /* 继续 */ }
+                // 读取 EXIF 拍摄日期
+                if(!dateFound) {
+                    try {
+                        const exifData = await exifr.parse(files[i], ['DateTimeOriginal','CreateDate']);
+                        const dt = exifData?.DateTimeOriginal || exifData?.CreateDate;
+                        if(dt) {
+                            const d = new Date(dt);
+                            if(!isNaN(d.getTime())) {
+                                const yyyy = d.getFullYear();
+                                const mm = String(d.getMonth()+1).padStart(2,'0');
+                                const dd = String(d.getDate()).padStart(2,'0');
+                                document.getElementById('photo-date').value = `${yyyy}-${mm}-${dd}`;
+                                dateFound = true;
+                            }
+                        }
+                    } catch(err) { /* 继续 */ }
+                }
+                if(gpsFound && dateFound) break;
+            }
+            if(!gpsFound) {
+                hint.textContent = '所选照片均无GPS信息，请点击下方「地图定位」'; hint.style.color = '#c88';
+            }
+
+            // 图片选好后，先上传图片，再启动 AI 聊天
+            if(formMode === 'record' && files.length > 0) {
+                const fd = new FormData();
+                for(let i = 0; i < files.length; i++) fd.append('images', files[i]);
+                try {
+                    const uploadRes = await fetch('/api/upload', { method:'POST', body:fd });
+                    const uploadData = await uploadRes.json();
+                    if(uploadData.paths) {
+                        uploadedImagePaths = uploadData.paths;
+                        // 获取地理位置标签
+                        const locLabel = pendingRecord
+                            ? (() => { const g = reverseGeocode(pendingRecord.lat, pendingRecord.lon); return g.nameZh || g.name || ''; })()
+                            : '';
+                        startAIChat(uploadedImagePaths, locLabel);
+                    } else if(uploadData.error) {
+                        hint.textContent = '⚠️ 上传失败：' + uploadData.error; hint.style.color = '#c66';
+                    }
+                } catch(e) {
+                    console.warn('图片上传失败', e);
+                    hint.textContent = '⚠️ 图片上传失败，请检查网络或文件格式'; hint.style.color = '#c66';
+                }
+            }
+        }
+
+        // ==================== 反向地理编码（用GeoJSON判断点在哪个国家） ====================
+        // 射线法判断点是否在多边形内
+        function pointInPolygon(lon, lat, ring) {
+            let inside = false;
+            for(let i=0,j=ring.length-1; i<ring.length; j=i++) {
+                const xi=ring[i][0], yi=ring[i][1], xj=ring[j][0], yj=ring[j][1];
+                if((yi>lat)!==(yj>lat) && lon<(xj-xi)*(lat-yi)/(yj-yi)+xi) inside=!inside;
+            }
+            return inside;
+        }
+        function reverseGeocode(lat, lon) {
+            if(!GEO_DATA) return {name:'', nameZh:'', featureIndex:null};
+            for(let fi=0; fi<GEO_DATA.features.length; fi++) {
+                const f=GEO_DATA.features[fi], geom=f.geometry, name=f.properties?.NAME||f.properties?.ADMIN||'';
+                let polys=[];
+                if(geom.type==='Polygon') polys=[geom.coordinates];
+                else if(geom.type==='MultiPolygon') polys=geom.coordinates;
+                for(const poly of polys) {
+                    if(pointInPolygon(lon, lat, poly[0])) {
+                        return {name, nameZh: ZH[name]||'', featureIndex:fi};
+                    }
+                }
+            }
+            return {name:'Ocean / 海洋', nameZh:'海洋', featureIndex:null};
+        }
+
+        // 城市搜索定位：通过后端地理编码并引导地球转到目标位置
+        function focusGlobeToLocation(lat, lon) {
+            const p = latLonToVector3(lat, lon, CONFIG.radius);
+            const rotY = Math.atan2(-p.x, p.z);
+            const zPrime = Math.sqrt(p.x * p.x + p.z * p.z);
+            const rotX = Math.atan2(p.y, zPrime);
+            targetRotationY = rotY;
+            targetRotationX = rotX;
+        }
+
+        async function onCitySearch() {
+            const input = document.getElementById('city-search-input');
+            const hint = document.getElementById('gps-hint');
+            const query = input.value.trim();
+            if (!query) {
+                hint.textContent = '请输入城市名后再搜索';
+                hint.style.color = '#c88';
+                return;
+            }
+            hint.textContent = '正在搜索城市位置...';
+            hint.style.color = '#888';
+            try {
+                const r = await fetch('/api/geocode?query=' + encodeURIComponent(query));
+                const d = await r.json();
+                if (!d.success || !d.location) {
+                    hint.textContent = '未找到该城市，请换个名字试试';
+                    hint.style.color = '#c88';
+                    return;
+                }
+                const { latitude, longitude, name, country } = d.location;
+                pendingRecord = { lat: latitude, lon: longitude };
+                const label = `${name}${country ? '（' + country + '）' : ''}`;
+                document.getElementById('coord-display').textContent = `经纬度：${latitude.toFixed(4)}°, ${longitude.toFixed(4)}° · ${label}`;
+                hint.textContent = `✓ 已搜索定位到：${label}`;
+                hint.style.color = '#4a9';
+                focusGlobeToLocation(latitude, longitude);
+                // 计划模式下自动启动AI规划对话
+                if (formMode === 'plan' && !chatSessionId) {
+                    startPlanAIChat(label);
+                }
+            } catch (e) {
+                hint.textContent = '城市搜索失败，请稍后重试';
+                hint.style.color = '#c66';
+            }
+        }
+
+        // ==================== 交互 ====================
+        let pendingRecord = null;
+        let pickedLocation = null; // 右键选中的临时位置
+        let longPressTimer = null; // 长按定时器（移动端）
+
+        // 点击"添加旅行记录"按钮 → 直接打开表单
+        function onAddRecordClick() {
+            formMode = 'record';
+            pendingRecord = null;
+            pickedLocation = null;
+            showForm(null, null, '');
+        }
+        function onAddPlanClick() {
+            formMode = 'plan';
+            pendingRecord = null;
+            pickedLocation = null;
+            showForm(null, null, '');
+        }
+        // 点击表单内"地图定位"按钮 → 隐藏表单，进入选位模式
+        function enterPickMode() {
+            awaitingLocationClick = true;
+            pickedLocation = null;
+            // 暂存表单内容，选位后恢复
+            window._savedDesc = document.getElementById('desc-input').value;
+            window._savedImageInput = document.getElementById('image-input').files;
+            // 隐藏表单，显示选位提示
+            document.getElementById('form-overlay').classList.remove('show');
+            document.getElementById('pick-hint').classList.add('show');
+        }
+        // 取消选位模式 → 回到表单
+        function cancelLocationMode() {
+            awaitingLocationClick=false;
+            pickedLocation=null;
+            document.getElementById('pick-hint').classList.remove('show');
+            hideLocConfirm();
+            // 恢复表单
+            document.getElementById('form-overlay').classList.add('show');
+        }
+        // 显示定位确认卡片（含国家+城市，逆地理编码）
+        async function showLocConfirm(lat, lon, screenX, screenY) {
+            pickedLocation = {lat, lon};
+            const geo = reverseGeocode(lat, lon);
+            let label = geo.nameZh ? `${geo.nameZh}（${geo.name}）` : (geo.name || '');
+            try {
+                const r = await fetch(`/api/reverse-geocode?lat=${lat}&lon=${lon}`);
+                const d = await r.json();
+                if (d.success && d.displayName) label = d.displayName;
+            } catch (e) {}
+            if (!label) label = '未知区域';
+            document.getElementById('loc-country').textContent = label;
+            document.getElementById('loc-coords').textContent = `${lat.toFixed(4)}°, ${lon.toFixed(4)}°`;
+            pickedLocation.label = label;
+            const card = document.getElementById('loc-confirm');
+            // 限制卡片在屏幕范围内
+            const cw = 280, ch = 110;
+            let cx = Math.min(screenX + 12, innerWidth - cw - 16);
+            let cy = Math.min(screenY - ch - 12, innerHeight - ch - 16);
+            if(cy < 50) cy = screenY + 12;
+            if(cx < 16) cx = 16;
+            card.style.left = cx + 'px';
+            card.style.top = cy + 'px';
+            card.classList.add('show');
+        }
+        function hideLocConfirm() {
+            document.getElementById('loc-confirm').classList.remove('show');
+            pickedLocation = null;
+        }
+        // 确认定位 → 回到表单，填入位置，恢复之前输入的内容
+        function confirmLocation() {
+            if(!pickedLocation) return;
+            const {lat, lon, label: locLabel} = pickedLocation;
+            pendingRecord = {lat, lon};
+            const geo = reverseGeocode(lat, lon);
+            const label = locLabel || (geo.nameZh ? `${geo.nameZh}（${geo.name}）` : (geo.name || ''));
+            awaitingLocationClick = false;
+            document.getElementById('pick-hint').classList.remove('show');
+            hideLocConfirm();
+            // 更新坐标显示
+            let coordText = `经纬度：${lat.toFixed(4)}°, ${lon.toFixed(4)}°`;
+            if(label) coordText += ` · ${label}`;
+            document.getElementById('coord-display').textContent = coordText;
+            document.getElementById('gps-hint').textContent = '✓ 已通过地图选取位置';
+            document.getElementById('gps-hint').style.color = '#4a9';
+            // 恢复之前的文字内容（不清空）
+            if(window._savedDesc) document.getElementById('desc-input').value = window._savedDesc;
+            // 显示表单
+            document.getElementById('form-overlay').classList.add('show');
+            // 计划模式下：选位后自动启动AI旅行规划助手
+            if(formMode === 'plan' && !chatSessionId) {
+                startPlanAIChat(label || `${lat.toFixed(2)}°, ${lon.toFixed(2)}°`);
+            }
+        }
+
+        function onMouseDown(e) {
+            if(e.target!==renderer.domElement) return;
+            hasDragged = false;
+            mouse.x=(e.clientX/innerWidth)*2-1; mouse.y=-(e.clientY/innerHeight)*2+1;
+            isDragging=true; previousMousePosition={x:e.clientX, y:e.clientY};
+            document.body.style.cursor='grabbing';
+        }
+        function onMouseMove(e) {
+            const mx=(e.clientX/innerWidth)*2-1, my=-(e.clientY/innerHeight)*2+1;
+            const rc = new THREE.Raycaster();
+            rc.setFromCamera(new THREE.Vector2(mx,my), camera);
+            const hits = rc.intersectObject(clickSphere);
+            if(hits.length>0 && earthGroup) {
+                const lp = hits[0].point.clone().applyMatrix4(earthGroup.matrixWorld.clone().invert());
+                const {lat, lon} = vector3ToLatLon(lp);
+                currentMouseLat = lat;
+                // 国家悬停高亮（需放大到国家标签可见时）
+                if (camera.position.z < ZOOM_THRESHOLD && GEO_DATA) {
+                    const geo = reverseGeocode(lat, lon);
+                    setCountryHover(geo.featureIndex);
+                } else setCountryHover(null);
+            } else { currentMouseLat = null; setCountryHover(null); }
+            if(!isDragging) return;
+            const dx=e.clientX-previousMousePosition.x, dy=e.clientY-previousMousePosition.y;
+            if(Math.abs(dx)>2||Math.abs(dy)>2) hasDragged=true;
+            targetRotationY+=dx*.003; targetRotationX+=dy*.003;
+            previousMousePosition={x:e.clientX,y:e.clientY};
+        }
+        // 左键松开：仅用于点击信箱查看详情
+        function onMouseUp(e) {
+            isDragging=false; document.body.style.cursor='grab';
+            if(hasDragged || e.target!==renderer.domElement) return;
+            // 选位模式下左键不操作（用右键选位）
+            if(awaitingLocationClick) return;
+            mouse.x=(e.clientX/innerWidth)*2-1; mouse.y=-(e.clientY/innerHeight)*2+1;
+            raycaster.setFromCamera(mouse, camera);
+            // 检测旅行记录信箱点击
+            const markerHits = raycaster.intersectObjects(recordsMarkers);
+            if(markerHits.length>0) {
+                const rec = markerHits[0].object.userData.record;
+                if(rec) { showDetail(rec, markerHits[0].object, 'record'); return; }
+            }
+            // 检测旅行计划红色邮箱点击
+            const planHits = raycaster.intersectObjects(planMarkers);
+            if(planHits.length>0) {
+                const plan = planHits[0].object.userData.plan;
+                if(plan) { showDetail(plan, planHits[0].object, 'plan'); return; }
+            }
+        }
+        // 右键点击：选位模式下选择位置
+        function onContextMenu(e) {
+            if(!awaitingLocationClick) return;
+            e.preventDefault();
+            const mx=(e.clientX/innerWidth)*2-1, my=-(e.clientY/innerHeight)*2+1;
+            raycaster.setFromCamera(new THREE.Vector2(mx,my), camera);
+            const hits = raycaster.intersectObject(clickSphere);
+            if(hits.length>0) {
+                const lp = hits[0].point.clone().applyMatrix4(earthGroup.matrixWorld.clone().invert());
+                const {lat,lon} = vector3ToLatLon(lp);
+                showLocConfirm(lat, lon, e.clientX, e.clientY);
+            }
+        }
+        // 触摸事件（移动端）：长按选位
+        function onTouchStart(e) {
+            if(!awaitingLocationClick) {
+                // 非选位模式：处理拖拽
+                if(e.touches.length!==1) return;
+                const t=e.touches[0];
+                hasDragged=false; isDragging=true;
+                previousMousePosition={x:t.clientX,y:t.clientY};
+                return;
+            }
+            if(e.touches.length!==1) return;
+            const t=e.touches[0];
+            hasDragged=false; isDragging=true;
+            previousMousePosition={x:t.clientX,y:t.clientY};
+            // 选位模式下开始长按定时器
+            longPressTimer = setTimeout(()=>{
+                if(hasDragged) return;
+                isDragging=false;
+                const mx=(t.clientX/innerWidth)*2-1, my=-(t.clientY/innerHeight)*2+1;
+                raycaster.setFromCamera(new THREE.Vector2(mx,my), camera);
+                const hits = raycaster.intersectObject(clickSphere);
+                if(hits.length>0) {
+                    const lp = hits[0].point.clone().applyMatrix4(earthGroup.matrixWorld.clone().invert());
+                    const {lat,lon} = vector3ToLatLon(lp);
+                    showLocConfirm(lat, lon, t.clientX, t.clientY);
+                }
+            }, 600);
+        }
+        function onTouchMove(e) {
+            if(e.touches.length!==1) return;
+            const t=e.touches[0];
+            const dx=t.clientX-previousMousePosition.x, dy=t.clientY-previousMousePosition.y;
+            if(Math.abs(dx)>4||Math.abs(dy)>4) { hasDragged=true; if(longPressTimer){clearTimeout(longPressTimer);longPressTimer=null;} }
+            if(!isDragging) return;
+            targetRotationY+=dx*.003; targetRotationX+=dy*.003;
+            previousMousePosition={x:t.clientX,y:t.clientY};
+        }
+        function onTouchEnd(e) {
+            isDragging=false;
+            if(longPressTimer){clearTimeout(longPressTimer);longPressTimer=null;}
+            // 非选位模式：短按检测信箱点击
+            if(!awaitingLocationClick && !hasDragged && e.changedTouches.length>0) {
+                const t=e.changedTouches[0];
+                mouse.x=(t.clientX/innerWidth)*2-1; mouse.y=-(t.clientY/innerHeight)*2+1;
+                raycaster.setFromCamera(mouse, camera);
+                const markerHits = raycaster.intersectObjects(recordsMarkers);
+                if(markerHits.length>0) {
+                    const rec = markerHits[0].object.userData.record;
+                    if(rec) { showDetail(rec, markerHits[0].object, 'record'); return; }
+                }
+                const planHits = raycaster.intersectObjects(planMarkers);
+                if(planHits.length>0) {
+                    const plan = planHits[0].object.userData.plan;
+                    if(plan) { showDetail(plan, planHits[0].object, 'plan'); return; }
+                }
+            }
+        }
+        function onMouseWheel(e) {
+            camera.position.z += e.deltaY*0.5;
+            camera.position.z = Math.max(350, Math.min(1200, camera.position.z));
+        }
+
+        // ==================== 信封粒子系统 ====================
+        let envelopeParticles = []; // 主信封粒子数组
+        let envelopeAnimId = null;  // 主信封动画帧ID
+        let decoParticles = [];     // 装饰信封粒子数组
+        let decoAnimId = null;      // 装饰信封动画帧ID
+        const PARTICLE_COLORS = [
+            [200,150,255], // 淡紫
+            [255,220,130], // 金色
+            [255,255,255], // 白色
+            [180,120,255], // 紫
+            [255,200,180], // 暖白
+        ];
+        // 在信封边缘随机取一个点
+        function randomEdgePoint(pad, w, h) {
+            const perim = 2*(w+h);
+            let t = Math.random() * perim;
+            if(t < w) return {x: pad + t, y: pad}; // 上边
+            t -= w;
+            if(t < h) return {x: pad + w, y: pad + t}; // 右边
+            t -= h;
+            if(t < w) return {x: pad + w - t, y: pad + h}; // 下边
+            t -= w;
+            return {x: pad, y: pad + h - t}; // 左边
+        }
+
+        function initEnvelopeParticles(canvas) {
+            const cardEl = canvas.parentElement.querySelector('.envelope-card');
+            const rect = cardEl.getBoundingClientRect();
+            const pad = 40; // canvas 外扩量
+            canvas.width = rect.width + pad * 2;
+            canvas.height = rect.height + pad * 2;
+            const ctx = canvas.getContext('2d');
+            envelopeParticles = [];
+            const cardW = rect.width, cardH = rect.height;
+
+            // 边缘粒子：沿信封边框分布的细密小粒子（1000个）
+            for(let i = 0; i < 1000; i++) {
+                const {x, y} = randomEdgePoint(pad, cardW, cardH);
+                const color = PARTICLE_COLORS[Math.floor(Math.random() * PARTICLE_COLORS.length)];
+                envelopeParticles.push({
+                    x: x + (Math.random()-0.5) * 8,
+                    y: y + (Math.random()-0.5) * 8,
+                    vx: (Math.random()-0.5) * 0.3,
+                    vy: (Math.random()-0.5) * 0.3,
+                    size: 0.6 + Math.random() * 1.2, // 细小
+                    color,
+                    alpha: 0.3 + Math.random() * 0.5,
+                    life: 1.5 + Math.random() * 3,
+                    maxLife: 0,
+                    flickerSpeed: 2 + Math.random() * 4,
+                    flickerOffset: Math.random() * Math.PI * 2,
+                    decay: 0.005 + Math.random() * 0.004,
+                    isEdge: true,
+                });
+                envelopeParticles[envelopeParticles.length-1].maxLife = envelopeParticles[envelopeParticles.length-1].life;
+            }
+            // 内部散落粒子（30个，在照片区）
+            const cx = canvas.width / 2, photoZoneY = canvas.height * 0.35;
+            for(let i = 0; i < 30; i++) {
+                const color = PARTICLE_COLORS[Math.floor(Math.random() * PARTICLE_COLORS.length)];
+                envelopeParticles.push({
+                    x: cx + (Math.random()-0.5) * cardW * 0.6,
+                    y: photoZoneY + (Math.random()-0.5) * canvas.height * 0.25,
+                    vx: (Math.random()-0.5) * 0.3,
+                    vy: (Math.random()-0.5) * 0.3,
+                    size: 0.8 + Math.random() * 1.5,
+                    color,
+                    alpha: 0.2 + Math.random() * 0.4,
+                    life: 2 + Math.random() * 3,
+                    maxLife: 0,
+                    flickerSpeed: 1.5 + Math.random() * 3,
+                    flickerOffset: Math.random() * Math.PI * 2,
+                    decay: 0.004 + Math.random() * 0.003,
+                    isEdge: false,
+                });
+                envelopeParticles[envelopeParticles.length-1].maxLife = envelopeParticles[envelopeParticles.length-1].life;
+            }
+
+            if(envelopeAnimId) cancelAnimationFrame(envelopeAnimId);
+            const startTime = performance.now();
+            function animateParticles() {
+                const elapsed = (performance.now() - startTime) / 1000;
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                for(let p of envelopeParticles) {
+                    p.x += p.vx;
+                    p.y += p.vy;
+                    p.vx *= 0.99; p.vy *= 0.99;
+                    p.life -= p.decay;
+                    if(p.life <= 0) {
+                        if(p.isEdge) {
+                            // 边缘粒子重生在边缘
+                            const pt = randomEdgePoint(pad, cardW, cardH);
+                            p.x = pt.x + (Math.random()-0.5) * 8;
+                            p.y = pt.y + (Math.random()-0.5) * 8;
+                            p.vx = (Math.random()-0.5) * 0.3;
+                            p.vy = (Math.random()-0.5) * 0.3;
+                        } else {
+                            // 内部粒子重生在照片区
+                            p.x = cx + (Math.random()-0.5) * cardW * 0.6;
+                            p.y = photoZoneY + (Math.random()-0.5) * canvas.height * 0.2;
+                            p.vx = (Math.random()-0.5) * 0.3;
+                            p.vy = (Math.random()-0.5) * 0.3;
+                        }
+                        p.life = 1.5 + Math.random() * 3;
+                        p.maxLife = p.life;
+                        p.alpha = 0.2 + Math.random() * 0.5;
+                        p.color = PARTICLE_COLORS[Math.floor(Math.random() * PARTICLE_COLORS.length)];
+                    }
+                    const flicker = 0.5 + 0.5 * Math.sin(elapsed * p.flickerSpeed + p.flickerOffset);
+                    const lifeAlpha = Math.min(1, p.life / (p.maxLife * 0.3));
+                    const a = p.alpha * flicker * lifeAlpha;
+                    if(a < 0.01) continue;
+                    const [r,g,b] = p.color;
+                    // 小粒子：实心小圆点，不用径向渐变
+                    ctx.fillStyle = `rgba(${r},${g},${b},${a})`;
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                envelopeAnimId = requestAnimationFrame(animateParticles);
+            }
+            animateParticles();
+        }
+        // ==================== 装饰信封边缘粒子系统 ====================
+        function initDecoParticles(canvas) {
+            const decoEl = canvas.parentElement;
+            const bodyEl = decoEl.querySelector('.envelope-deco-body');
+            if(!bodyEl) return;
+            const dPad = 30;
+            const dW = bodyEl.offsetWidth;
+            const dH = bodyEl.offsetHeight;
+            canvas.width = dW + dPad * 2;
+            canvas.height = dH + dPad * 2;
+            const ctx = canvas.getContext('2d');
+            decoParticles = [];
+
+            // 装饰信封边缘：600个细密粒子
+            for(let i = 0; i < 600; i++) {
+                const {x, y} = randomEdgePoint(dPad, dW, dH);
+                const color = PARTICLE_COLORS[Math.floor(Math.random() * PARTICLE_COLORS.length)];
+                decoParticles.push({
+                    x: x + (Math.random()-0.5) * 6,
+                    y: y + (Math.random()-0.5) * 6,
+                    vx: (Math.random()-0.5) * 0.25,
+                    vy: (Math.random()-0.5) * 0.25,
+                    size: 0.5 + Math.random() * 1.0,
+                    color,
+                    alpha: 0.25 + Math.random() * 0.45,
+                    life: 1.5 + Math.random() * 3,
+                    maxLife: 0,
+                    flickerSpeed: 2 + Math.random() * 4,
+                    flickerOffset: Math.random() * Math.PI * 2,
+                    decay: 0.005 + Math.random() * 0.004,
+                });
+                decoParticles[decoParticles.length-1].maxLife = decoParticles[decoParticles.length-1].life;
+            }
+
+            if(decoAnimId) cancelAnimationFrame(decoAnimId);
+            const startTime = performance.now();
+            function animateDeco() {
+                const elapsed = (performance.now() - startTime) / 1000;
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                for(let p of decoParticles) {
+                    p.x += p.vx; p.y += p.vy;
+                    p.vx *= 0.99; p.vy *= 0.99;
+                    p.life -= p.decay;
+                    if(p.life <= 0) {
+                        const pt = randomEdgePoint(dPad, dW, dH);
+                        p.x = pt.x + (Math.random()-0.5) * 6;
+                        p.y = pt.y + (Math.random()-0.5) * 6;
+                        p.vx = (Math.random()-0.5) * 0.25;
+                        p.vy = (Math.random()-0.5) * 0.25;
+                        p.life = 1.5 + Math.random() * 3;
+                        p.maxLife = p.life;
+                        p.alpha = 0.2 + Math.random() * 0.45;
+                        p.color = PARTICLE_COLORS[Math.floor(Math.random() * PARTICLE_COLORS.length)];
+                    }
+                    const flicker = 0.5 + 0.5 * Math.sin(elapsed * p.flickerSpeed + p.flickerOffset);
+                    const lifeAlpha = Math.min(1, p.life / (p.maxLife * 0.3));
+                    const a = p.alpha * flicker * lifeAlpha;
+                    if(a < 0.01) continue;
+                    const [r,g,b] = p.color;
+                    ctx.fillStyle = `rgba(${r},${g},${b},${a})`;
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                decoAnimId = requestAnimationFrame(animateDeco);
+            }
+            animateDeco();
+        }
+
+        function stopEnvelopeParticles() {
+            if(envelopeAnimId) { cancelAnimationFrame(envelopeAnimId); envelopeAnimId = null; }
+            envelopeParticles = [];
+            const canvas = document.getElementById('envelope-particles');
+            if(canvas) { const ctx = canvas.getContext('2d'); ctx.clearRect(0,0,canvas.width,canvas.height); }
+            // 同时停止装饰信封粒子
+            if(decoAnimId) { cancelAnimationFrame(decoAnimId); decoAnimId = null; }
+            decoParticles = [];
+            const decoCanvas = document.getElementById('deco-particles');
+            if(decoCanvas) { const dCtx = decoCanvas.getContext('2d'); dCtx.clearRect(0,0,decoCanvas.width,decoCanvas.height); }
+        }
+
+        // ==================== Q版角色 SVG 渲染器（精致 chibi 模板 + AI 特征着色） ====================
+        function renderChibiCharacter(style) {
+            const hex = c => /^#[0-9A-Fa-f]{3,8}$/i.test(c||'') ? c : null;
+            const topC = hex(style?.topColor) || '#8B7EB8';
+            const botC = hex(style?.bottomColor) || '#5A5A7A';
+            const hc = hex(style?.hairColor) || '#2a1810';
+            // 发色渐变：亮色和暗色
+            const hcL = adjustColor(hc, 30); // 亮一点的发色（高光用）
+            const hcD = adjustColor(hc, -20); // 暗一点的发色（阴影用）
+            const hair = (style?.hair || 'long').toLowerCase();
+            const skinMap = { light:['#fce4d6','#f0cdb8'], medium:['#f0d0b0','#e4b898'], warm:['#e8c098','#d4a478'] };
+            const [skinL, skinD] = skinMap[style?.skin] || skinMap.light;
+            const uid = 'ch' + Math.random().toString(36).slice(2,8); // 唯一ID前缀
+
+            // 辅助：微调颜色明度
+            function adjustColor(hex, amt) {
+                let c = hex.replace('#','');
+                if(c.length===3) c=c[0]+c[0]+c[1]+c[1]+c[2]+c[2];
+                let r=parseInt(c.slice(0,2),16), g=parseInt(c.slice(2,4),16), b=parseInt(c.slice(4,6),16);
+                r=Math.min(255,Math.max(0,r+amt)); g=Math.min(255,Math.max(0,g+amt)); b=Math.min(255,Math.max(0,b+amt));
+                return '#'+[r,g,b].map(v=>v.toString(16).padStart(2,'0')).join('');
+            }
+
+            // ---- 发型路径 ----
+            let hairBack='', hairFront='', hairSide='';
+            if(hair==='short'){
+                hairBack=`<ellipse cx="100" cy="58" rx="58" ry="48" fill="url(#${uid}hg)"/>`;
+                hairFront=`
+                    <path d="M42 75 Q50 38 100 28 Q150 38 158 75 Q148 60 130 52 Q115 42 100 40 Q85 42 70 52 Q52 60 42 75Z" fill="url(#${uid}hg)"/>
+                    <path d="M52 65 Q70 48 85 55 L80 60 Q68 52 56 68Z" fill="${hcL}" opacity="0.18"/>`;
+            } else if(hair==='medium'){
+                hairBack=`<ellipse cx="100" cy="55" rx="60" ry="50" fill="url(#${uid}hg)"/>
+                    <path d="M42 80 Q36 110 40 145 L48 145 Q44 110 48 82Z" fill="url(#${uid}hg)"/>
+                    <path d="M158 80 Q164 110 160 145 L152 145 Q156 110 152 82Z" fill="url(#${uid}hg)"/>`;
+                hairFront=`
+                    <path d="M38 78 Q42 32 100 22 Q158 32 162 78 Q150 58 132 50 Q118 38 100 36 Q82 38 68 50 Q50 58 38 78Z" fill="url(#${uid}hg)"/>
+                    <path d="M48 68 Q65 45 80 54 L76 58 Q63 48 52 70Z" fill="${hcL}" opacity="0.15"/>
+                    <path d="M152 68 Q135 45 120 54 L124 58 Q137 48 148 70Z" fill="${hcL}" opacity="0.15"/>`;
+                hairSide=`
+                    <path d="M44 85 Q36 105 38 135 L44 134 Q42 106 48 88Z" fill="${hcD}" opacity="0.5"/>
+                    <path d="M156 85 Q164 105 162 135 L156 134 Q158 106 152 88Z" fill="${hcD}" opacity="0.5"/>`;
+            } else { // long
+                hairBack=`<ellipse cx="100" cy="54" rx="62" ry="52" fill="url(#${uid}hg)"/>
+                    <path d="M40 78 Q30 130 34 195 L44 194 Q40 130 46 80Z" fill="url(#${uid}hg)"/>
+                    <path d="M160 78 Q170 130 166 195 L156 194 Q160 130 154 80Z" fill="url(#${uid}hg)"/>
+                    <path d="M44 90 Q32 140 38 200 L46 199 Q38 140 48 92Z" fill="${hcD}" opacity="0.4"/>
+                    <path d="M156 90 Q168 140 162 200 L154 199 Q162 140 152 92Z" fill="${hcD}" opacity="0.4"/>`;
+                hairFront=`
+                    <path d="M36 80 Q40 28 100 18 Q160 28 164 80 Q152 56 134 48 Q118 34 100 32 Q82 34 66 48 Q48 56 36 80Z" fill="url(#${uid}hg)"/>
+                    <path d="M46 70 Q64 42 78 52 L74 57 Q62 46 50 72Z" fill="${hcL}" opacity="0.14"/>
+                    <path d="M154 70 Q136 42 122 52 L126 57 Q138 46 150 72Z" fill="${hcL}" opacity="0.14"/>`;
+                hairSide=`
+                    <path d="M42 88 Q32 115 34 155 L42 154 Q38 115 46 90Z" fill="${hcD}" opacity="0.55"/>
+                    <path d="M158 88 Q168 115 166 155 L158 154 Q162 115 154 90Z" fill="${hcD}" opacity="0.55"/>`;
+            }
+
+            return `<svg viewBox="0 0 200 320" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+                <radialGradient id="${uid}sk" cx="48%" cy="40%" r="55%"><stop offset="0%" stop-color="${skinL}"/><stop offset="100%" stop-color="${skinD}"/></radialGradient>
+                <linearGradient id="${uid}hg" x1="30%" y1="0%" x2="70%" y2="100%"><stop offset="0%" stop-color="${hcL}"/><stop offset="100%" stop-color="${hcD}"/></linearGradient>
+                <radialGradient id="${uid}ir" cx="38%" cy="38%" r="55%"><stop offset="0%" stop-color="#6488aa"/><stop offset="100%" stop-color="#3a4a5c"/></radialGradient>
+            </defs>
+            <!-- 地面阴影 -->
+            <ellipse cx="100" cy="308" rx="42" ry="5" fill="rgba(0,0,0,0.08)"/>
+
+            <!-- 头发后层 -->
+            ${hairBack}
+
+            <!-- 身体 -->
+            <!-- 脖子 -->
+            <rect x="90" y="158" width="20" height="14" rx="6" fill="url(#${uid}sk)"/>
+            <!-- 上衣 -->
+            <path d="M68 172 Q68 168 74 165 L126 165 Q132 168 132 172 L132 224 Q100 230 68 224Z" fill="${topC}" rx="8"/>
+            <!-- 衣领V -->
+            <path d="M84 165 L100 180 L116 165" fill="none" stroke="${adjustColor(topC,-30)}" stroke-width="2.5" stroke-linecap="round"/>
+            <!-- 上衣褶皱暗示 -->
+            <path d="M82 190 Q90 195 88 210" fill="none" stroke="${adjustColor(topC,-20)}" stroke-width="1" opacity="0.3"/>
+            <path d="M118 190 Q110 195 112 210" fill="none" stroke="${adjustColor(topC,-20)}" stroke-width="1" opacity="0.3"/>
+            <!-- 手臂+手 -->
+            <path d="M68 175 Q50 188 44 210" stroke="url(#${uid}sk)" fill="none" stroke-width="12" stroke-linecap="round"/>
+            <path d="M132 175 Q150 188 156 210" stroke="url(#${uid}sk)" fill="none" stroke-width="12" stroke-linecap="round"/>
+            <circle cx="44" cy="212" r="7" fill="url(#${uid}sk)"/>
+            <circle cx="156" cy="212" r="7" fill="url(#${uid}sk)"/>
+            <!-- 袖口 -->
+            <path d="M66 172 Q52 182 48 195" stroke="${topC}" fill="none" stroke-width="10" stroke-linecap="round"/>
+            <path d="M134 172 Q148 182 152 195" stroke="${topC}" fill="none" stroke-width="10" stroke-linecap="round"/>
+            <!-- 下装 -->
+            <path d="M70 222 L62 275 Q100 282 138 275 L130 222Z" fill="${botC}"/>
+            <!-- 腿 -->
+            <rect x="76" y="272" width="16" height="26" rx="6" fill="url(#${uid}sk)"/>
+            <rect x="108" y="272" width="16" height="26" rx="6" fill="url(#${uid}sk)"/>
+            <!-- 鞋 -->
+            <ellipse cx="84" cy="300" rx="14" ry="7" fill="#4a4050"/>
+            <ellipse cx="116" cy="300" rx="14" ry="7" fill="#4a4050"/>
+            <ellipse cx="84" cy="298" rx="14" ry="4" fill="#5a5060"/>
+            <ellipse cx="116" cy="298" rx="14" ry="4" fill="#5a5060"/>
+
+            <!-- 头部 -->
+            <ellipse cx="100" cy="95" rx="62" ry="66" fill="url(#${uid}sk)"/>
+
+            <!-- 头发侧面 -->
+            ${hairSide}
+
+            <!-- 眼睛 -->
+            <!-- 左眼 -->
+            <ellipse cx="72" cy="92" rx="18" ry="22" fill="white"/>
+            <ellipse cx="74" cy="95" rx="14" ry="18" fill="url(#${uid}ir)"/>
+            <circle cx="74" cy="96" r="7" fill="#1a1520"/>
+            <circle cx="67" cy="86" r="5.5" fill="white" opacity="0.95"/>
+            <circle cx="79" cy="90" r="2.8" fill="white" opacity="0.8"/>
+            <circle cx="71" cy="102" r="1.5" fill="white" opacity="0.5"/>
+            <!-- 右眼 -->
+            <ellipse cx="128" cy="92" rx="18" ry="22" fill="white"/>
+            <ellipse cx="126" cy="95" rx="14" ry="18" fill="url(#${uid}ir)"/>
+            <circle cx="126" cy="96" r="7" fill="#1a1520"/>
+            <circle cx="120" cy="86" r="5.5" fill="white" opacity="0.95"/>
+            <circle cx="132" cy="90" r="2.8" fill="white" opacity="0.8"/>
+            <circle cx="124" cy="102" r="1.5" fill="white" opacity="0.5"/>
+            <!-- 上眼睑线 -->
+            <path d="M54 78 Q72 70 90 78" fill="none" stroke="#00000018" stroke-width="2.5"/>
+            <path d="M110 78 Q128 70 146 78" fill="none" stroke="#00000018" stroke-width="2.5"/>
+            <!-- 睫毛 -->
+            <path d="M54 78 Q50 74 48 70" fill="none" stroke="${hcD}" stroke-width="1.5" stroke-linecap="round" opacity="0.5"/>
+            <path d="M146 78 Q150 74 152 70" fill="none" stroke="${hcD}" stroke-width="1.5" stroke-linecap="round" opacity="0.5"/>
+
+            <!-- 眉毛 -->
+            <path d="M56 72 Q68 65 84 70" fill="none" stroke="${hcD}" stroke-width="2.2" opacity="0.35" stroke-linecap="round"/>
+            <path d="M116 70 Q132 65 144 72" fill="none" stroke="${hcD}" stroke-width="2.2" opacity="0.35" stroke-linecap="round"/>
+
+            <!-- 腮红 -->
+            <ellipse cx="48" cy="108" rx="12" ry="6.5" fill="#FFB0B0" opacity="0.38"/>
+            <ellipse cx="152" cy="108" rx="12" ry="6.5" fill="#FFB0B0" opacity="0.38"/>
+
+            <!-- 鼻子（极小） -->
+            <circle cx="100" cy="106" r="1.5" fill="${skinD}" opacity="0.35"/>
+
+            <!-- 嘴巴 -->
+            <path d="M90 118 Q100 126 110 118" fill="none" stroke="#D06868" stroke-width="2" stroke-linecap="round"/>
+
+            <!-- 头发前层（刘海）-->
+            ${hairFront}
+
+            <!-- 头发高光 -->
+            <ellipse cx="78" cy="42" rx="18" ry="5" fill="white" opacity="0.1" transform="rotate(-12,78,42)"/>
+            <ellipse cx="118" cy="45" rx="12" ry="3.5" fill="white" opacity="0.07" transform="rotate(8,118,45)"/>
+            </svg>`;
+        }
+
+        // ==================== 获取图片路径数组（兼容旧数据） ====================
+        function getImagePaths(rec) {
+            if(rec.imagePaths && Array.isArray(rec.imagePaths) && rec.imagePaths.length > 0) return rec.imagePaths;
+            if(rec.imagePath) return [rec.imagePath]; // 兼容旧单图数据
+            return [];
+        }
+
+        // ==================== 信封详情（深紫信封 + 宝丽来 + 粒子 + 天气 + 撤回） ====================
+        // 颜色主题配置
+        const DETAIL_THEMES = {
+            record: {
+                cardBg: 'rgba(80,50,120,0.55)',
+                border: 'rgba(200,160,255,0.2)',
+                decoBg: 'rgba(90,60,130,0.4)',
+                decoFlap: 'rgba(100,65,150,0.5)',
+                particleColors: [[160,130,220],[130,160,230],[180,150,255],[140,180,240],[200,190,255]],
+                deleteText: '撤回此信箱',
+            },
+            plan: {
+                cardBg: 'rgba(100,60,55,0.5)',
+                border: 'rgba(220,160,140,0.2)',
+                decoBg: 'rgba(110,65,55,0.35)',
+                decoFlap: 'rgba(140,75,65,0.45)',
+                particleColors: [[220,180,80],[255,200,100],[200,100,80],[240,160,60],[255,220,130]],
+                deleteText: '取消此计划',
+            }
+        };
+
+        async function showDetail(rec, markerSprite, type) {
+            currentDetailGroup = markerSprite || null;
+            currentDetailType = type || 'record';
+            const theme = DETAIL_THEMES[currentDetailType];
+            const overlay = document.getElementById('detail-overlay');
+            const polaroidArea = document.getElementById('polaroid-area');
+            const desc = document.getElementById('detail-desc');
+            const meta = document.getElementById('detail-meta');
+            const weather = document.getElementById('detail-weather');
+            const deleteBtn = document.getElementById('detail-delete');
+            const card = overlay.querySelector('.envelope-card');
+            const decoBody = overlay.querySelector('.envelope-deco-body');
+            const decoFlap = overlay.querySelector('.envelope-deco-flap');
+
+            // 应用颜色主题
+            card.style.background = theme.cardBg;
+            card.style.borderColor = theme.border;
+            if(decoBody) decoBody.style.background = theme.decoBg;
+            if(decoFlap) decoFlap.style.background = theme.decoFlap;
+            deleteBtn.textContent = theme.deleteText;
+
+            // Q版角色显示：支持多人透明底图片并排
+            const chibiWrap = document.getElementById('envelope-chibi-wrap');
+            if (chibiWrap) {
+                const chibiPaths = rec.chibiImagePaths || (rec.chibiImagePath ? [rec.chibiImagePath] : []);
+                const styles = rec.characterStyles || [];
+                if (currentDetailType === 'record' && chibiPaths.length > 0) {
+                    // 显示 AI 生成的透明底角色图片（支持多人）
+                    chibiWrap.style.display = 'flex';
+                    chibiWrap.innerHTML = chibiPaths.map((p, i) =>
+                        `<div class="chibi-item chibi-ai-img" style="animation-delay:${i * 0.15}s"><img src="${p}" alt="Q版角色${i+1}" onerror="this.parentElement.style.display='none'"/></div>`
+                    ).join('');
+                } else if (currentDetailType === 'record' && styles.length > 0) {
+                    // 回退：用 SVG 模板 + AI 提取的颜色特征渲染
+                    chibiWrap.style.display = 'flex';
+                    chibiWrap.innerHTML = styles.slice(0, 3).map(s => `<div class="chibi-item">${renderChibiCharacter(s)}</div>`).join('');
+                } else {
+                    chibiWrap.style.display = 'none';
+                    chibiWrap.innerHTML = '';
+                }
+            }
+
+            // 清空宝丽来区域
+            polaroidArea.innerHTML = '';
+
+            // 填充文字/天气/元信息（优先显示AI总结，其次用户描述）
+            desc.textContent = cleanAIText(rec.aiSummary || rec.description || '无文字记录');
+            const geo = reverseGeocode(rec.lat, rec.lon);
+            const locLabel = geo.nameZh ? `${geo.nameZh}` : (geo.name || '');
+            // 使用拍摄日期（如果有），否则用创建日期
+            const displayDate = rec.photoDate || (rec.createdAt ? new Date(rec.createdAt).toLocaleDateString('zh-CN') : '');
+            meta.textContent = `${locLabel} · ${rec.lat?.toFixed(2)}°, ${rec.lon?.toFixed(2)}° · ${displayDate}`;
+            if(rec.weather) {
+                weather.style.display = 'block';
+                const estimated = rec.weather.estimated ? '（估计）' : '';
+                weather.textContent = `${getWeatherDesc(rec.weather.weathercode)}  ${rec.weather.temperature}°C  风速 ${rec.weather.windspeed} km/h ${estimated}`;
+            } else { weather.style.display = 'none'; }
+
+            // 获取图片列表（仅旅行记录有图片）
+            const images = currentDetailType === 'record' ? getImagePaths(rec) : [];
+
+            // 生成宝丽来卡片（HEIC 需 heic2any 转换后显示）
+            for (let i = 0; i < images.length; i++) {
+                const src = images[i];
+                const div = document.createElement('div');
+                div.className = 'polaroid';
+                const rotate = (Math.random() - 0.5) * 24;
+                const tx = (Math.random() - 0.5) * 10;
+                div.style.setProperty('--final-rotate', rotate + 'deg');
+                div.style.setProperty('--final-tx', tx + 'px');
+                const img = document.createElement('img');
+                img.alt = `照片 ${i+1}`;
+                const isHeic = /\.(heic|heif)$/i.test(src);
+                if (isHeic) {
+                    // HEIC：通过服务端 sips 转 JPEG 显示（比前端 heic2any 更可靠）
+                    const filename = src.split('/').pop();
+                    img.src = `/api/heic-preview/${encodeURIComponent(filename)}`;
+                    img.onerror = () => { img.style.background='linear-gradient(135deg,#ddd,#bbb)'; img.alt='HEIC 照片加载失败'; img.style.minHeight='120px'; };
+                } else { img.src = src; }
+                div.appendChild(img);
+                const label = document.createElement('div');
+                label.className = 'polaroid-label';
+                label.textContent = rec.photoDate || (rec.createdAt ? new Date(rec.createdAt).toLocaleDateString('zh-CN') : '');
+                div.appendChild(label);
+                polaroidArea.appendChild(div);
+            }
+
+            // 漂浮关键词气泡（支持 {text,type} 对象格式和旧 string 格式）
+            const kwFloat = document.getElementById('keywords-float');
+            kwFloat.innerHTML = '';
+            const keywords = rec.keywords || [];
+            const chatLog = rec.chatLog || [];
+            if (keywords.length > 0) {
+                const bubbleClass = currentDetailType === 'plan' ? 'warm' : 'purple';
+                const bigTypes = new Set(['scene','place','feature']);
+                keywords.forEach((kw, i) => {
+                    const text = typeof kw === 'string' ? kw : kw.text;
+                    const type = typeof kw === 'string' ? 'other' : (kw.type || 'other');
+                    const isBig = bigTypes.has(type);
+                    const span = document.createElement('span');
+                    span.className = 'kw-bubble ' + bubbleClass + (isBig ? ' big' : ' small');
+                    span.textContent = text;
+                    // 随机动画参数
+                    const dur = 2.5 + Math.random() * 2;
+                    const delay = Math.random() * 2;
+                    const dy = -(2 + Math.random() * 3);
+                    const scale = 1.01 + Math.random() * 0.03;
+                    span.style.setProperty('--kw-dur', dur + 's');
+                    span.style.setProperty('--kw-delay', delay + 's');
+                    span.style.setProperty('--kw-dy', dy + 'px');
+                    span.style.setProperty('--kw-scale', scale);
+                    // 轻微散落
+                    span.style.marginLeft = (Math.random() * 8) + 'px';
+                    // 点击关键词 → 打开聊天记录并跳转到包含此关键词的消息
+                    if (chatLog.length > 0) {
+                        span.addEventListener('click', () => jumpToChatKeyword(text, chatLog));
+                    }
+                    kwFloat.appendChild(span);
+                });
+            }
+
+            // 查看完整对话 & 继续聊天按钮
+            const chatBtn = document.getElementById('btn-view-chat');
+            const continueBtn = document.getElementById('btn-continue-chat');
+            if (rec.chatLog && rec.chatLog.length > 0) {
+                chatBtn.style.display = '';
+                chatBtn._chatLog = rec.chatLog;
+                continueBtn.style.display = '';
+                continueBtn._rec = rec;
+                continueBtn._type = type;
+            } else {
+                chatBtn.style.display = 'none';
+                continueBtn.style.display = 'none';
+            }
+
+            // 显示信封
+            overlay.classList.add('show');
+
+            // 重新触发CSS动画
+            card.style.animation = 'none'; card.offsetHeight; card.style.animation = '';
+
+            // 启动粒子效果（使用主题颜色，包括主信封和装饰信封）
+            setTimeout(() => {
+                PARTICLE_COLORS.length = 0;
+                theme.particleColors.forEach(c => PARTICLE_COLORS.push(c));
+                initEnvelopeParticles(document.getElementById('envelope-particles'));
+                initDecoParticles(document.getElementById('deco-particles'));
+            }, 100);
+
+            // 照片依次飘出动画
+            const polaroids = polaroidArea.querySelectorAll('.polaroid');
+            polaroids.forEach((p, i) => {
+                setTimeout(() => {
+                    const rotate = p.style.getPropertyValue('--final-rotate');
+                    const tx = p.style.getPropertyValue('--final-tx');
+                    p.style.transform = `translateY(0) scale(1) rotate(${rotate}) translateX(${tx})`;
+                    p.classList.add('show');
+                }, 900 + i * 150);
+            });
+        }
+
+        // 显示完整聊天记录
+        function showChatLog() {
+            const chatBtn = document.getElementById('btn-view-chat');
+            const chatLog = chatBtn._chatLog;
+            if (!chatLog || chatLog.length === 0) return;
+            const body = document.getElementById('chat-log-body');
+            body.innerHTML = '';
+            chatLog.forEach(msg => {
+                const div = document.createElement('div');
+                div.className = 'cl-msg ' + (msg.role === 'ai' ? 'ai' : 'user');
+                const bubble = document.createElement('div');
+                bubble.className = 'cl-bubble';
+                bubble.textContent = msg.role === 'ai' ? cleanAIText(msg.text) : msg.text;
+                div.appendChild(bubble);
+                body.appendChild(div);
+            });
+            document.getElementById('chat-log-modal').style.display = 'flex';
+        }
+
+        // 点击关键词 → 打开聊天记录并高亮关键词文字，滚动到对应消息
+        function jumpToChatKeyword(keyword, chatLog) {
+            if (!chatLog || chatLog.length === 0) return;
+            const body = document.getElementById('chat-log-body');
+            body.innerHTML = '';
+            let targetEl = null;
+            // 转义正则特殊字符
+            const escaped = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const re = new RegExp(`(${escaped})`, 'gi');
+            chatLog.forEach((msg, idx) => {
+                const div = document.createElement('div');
+                div.className = 'cl-msg ' + (msg.role === 'ai' ? 'ai' : 'user');
+                const bubble = document.createElement('div');
+                bubble.className = 'cl-bubble';
+                const cleanText = msg.role === 'ai' ? cleanAIText(msg.text) : msg.text;
+                if (cleanText.includes(keyword)) {
+                    // 用 <mark> 高亮关键词，其余保持原样
+                    bubble.innerHTML = cleanText.replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(re, '<span class="cl-kw-mark">$1</span>');
+                    if (!targetEl) targetEl = div;
+                } else {
+                    bubble.textContent = cleanText;
+                }
+                div.appendChild(bubble);
+                body.appendChild(div);
+            });
+            document.getElementById('chat-log-modal').style.display = 'flex';
+            if (targetEl) {
+                setTimeout(() => targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' }), 100);
+            }
+        }
+
+        // 继续聊天：从详情页恢复对话
+        async function onContinueChat() {
+            const btn = document.getElementById('btn-continue-chat');
+            const rec = btn._rec;
+            const type = btn._type || 'record';
+            if (!rec || !rec.chatLog || rec.chatLog.length === 0) return;
+
+            btn.textContent = '正在恢复...';
+            btn.disabled = true;
+            try {
+                // 恢复会话
+                const r = await fetch('/api/chat/resume', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ chatLog: rec.chatLog, keywords: rec.keywords, type })
+                });
+                const d = await r.json();
+                if (!d.success) { alert('恢复对话失败：' + (d.error || '')); return; }
+
+                // 关闭详情弹窗
+                closeDetail();
+
+                // 设置表单模式
+                formMode = type;
+                pendingRecord = { lat: rec.lat, lon: rec.lon };
+
+                // 先显示表单（showForm 会清空聊天状态），再恢复会话ID
+                showForm(rec.lat, rec.lon);
+                chatSessionId = d.sessionId;
+                isChatActive = true;
+                chatKeywords = rec.keywords || [];
+
+                // 显示聊天区域并恢复历史消息
+                const chatSection = document.getElementById('chat-section');
+                const chatMsgs = document.getElementById('chat-messages');
+                chatSection.style.display = '';
+                chatMsgs.innerHTML = '';
+                document.getElementById('chat-title').textContent = type === 'plan' ? '🐱 漫游喵 · 继续规划' : '🦌 拾光鹿 · 继续回忆';
+                document.getElementById('chat-status').textContent = '对话中';
+
+                // 渲染历史消息（最后 6 条）
+                const recentLog = rec.chatLog.slice(-6);
+                recentLog.forEach(msg => appendChatMsg(msg.role === 'ai' ? 'ai' : 'user', msg.text));
+
+                // 追加一条提示
+                appendChatMsg('ai', '我回来了，我们继续聊吧～');
+
+                // 存储当前记录/计划的 ID，保存时用于更新
+                window._continuingRecordId = rec.id;
+                window._continuingType = type;
+            } catch (e) {
+                alert('恢复对话失败');
+            } finally {
+                btn.textContent = '💬 继续聊天';
+                btn.disabled = false;
+            }
+        }
+
+        function closeDetail() {
+            document.getElementById('detail-overlay').classList.remove('show');
+            stopEnvelopeParticles();
+            document.getElementById('keywords-float').innerHTML = '';
+            document.getElementById('chat-log-modal').style.display = 'none';
+            currentDetailGroup = null;
+            currentDetailType = 'record';
+        }
+
+        // ==================== 撤回信箱/取消计划 ====================
+        async function deleteCurrentRecord() {
+            if(!currentDetailGroup) return;
+
+            if(currentDetailType === 'plan') {
+                const plan = currentDetailGroup.userData.plan;
+                if(!plan || !plan.id) { alert('无法取消：计划信息缺失'); return; }
+                if(!confirm('确定要取消这个旅行计划吗？')) return;
+                try {
+                    const r = await fetch('/api/plans/' + plan.id, { method:'DELETE' });
+                    const d = await r.json();
+                    if(d.success) {
+                        earthGroup.remove(currentDetailGroup);
+                        if(currentDetailGroup.material) currentDetailGroup.material.dispose();
+                        const idx = planMarkers.indexOf(currentDetailGroup);
+                        if(idx > -1) planMarkers.splice(idx, 1);
+                        closeDetail();
+                    } else { alert('取消失败：' + (d.error || '未知错误')); }
+                } catch(e) { alert('取消失败'); }
+            } else {
+                const rec = currentDetailGroup.userData.record;
+                if(!rec || !rec.id) { alert('无法撤回：记录信息缺失'); return; }
+                if(!confirm('确定要撤回这个信箱吗？此操作不可恢复。')) return;
+                try {
+                    const r = await fetch('/api/records/' + rec.id, { method:'DELETE' });
+                    const d = await r.json();
+                    if(d.success) {
+                        earthGroup.remove(currentDetailGroup);
+                        if(currentDetailGroup.material) currentDetailGroup.material.dispose();
+                        const idx = recordsMarkers.indexOf(currentDetailGroup);
+                        if(idx > -1) recordsMarkers.splice(idx, 1);
+                        closeDetail();
+                    } else { alert('撤回失败：' + (d.error || '未知错误')); }
+                } catch(e) { alert('撤回失败'); }
+            }
+        }
+
+        // ==================== AI 聊天系统 ====================
+        let chatSessionId = null;          // 当前 AI 对话会话ID
+        let chatKeywords = [];             // 当前累积的关键词
+        let isChatActive = false;          // AI 聊天是否活跃
+        let uploadedImagePaths = [];       // 已上传的图片路径（用于AI）
+        let speechRecognition = null;      // Web Speech API 实例
+        let isRecording = false;           // 是否正在录音
+        let finalTranscript = '';          // 累积的最终识别文本（continuous 模式）
+        let sphereAnimId = null;           // 粒子球动画ID
+        let sphereParticles = [];          // 粒子球粒子
+
+        // 初始化 Web Speech API（continuous 模式，手动结束）
+        function initSpeechRecognition() {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (!SpeechRecognition) {
+                console.warn('浏览器不支持语音识别');
+                return;
+            }
+            speechRecognition = new SpeechRecognition();
+            speechRecognition.lang = 'zh-CN';
+            speechRecognition.continuous = true;       // 持续监听，不自动断
+            speechRecognition.interimResults = true;
+
+            speechRecognition.onresult = (event) => {
+                let interim = '';
+                for (let i = event.resultIndex; i < event.results.length; i++) {
+                    if (event.results[i].isFinal) {
+                        finalTranscript += event.results[i][0].transcript;
+                    } else {
+                        interim += event.results[i][0].transcript;
+                    }
+                }
+                // 保存当前 interim 文本用于兜底
+                window._lastInterim = interim;
+                // 显示实时文字：已确认的 + 临时的
+                const display = finalTranscript + interim;
+                document.getElementById('voice-interim').textContent = display.slice(-40);
+            };
+            speechRecognition.onerror = (e) => {
+                console.warn('语音识别错误:', e.error);
+                if (e.error !== 'no-speech') stopAndSendVoice();
+            };
+            // continuous 模式下浏览器可能自动结束，需要重启
+            speechRecognition.onend = () => {
+                if (isRecording) {
+                    // 还在录音模式但浏览器自动断了，重新启动
+                    try { speechRecognition.start(); } catch(e) {}
+                } else if (window._pendingVoiceSend) {
+                    // 录音已停止，浏览器最后的结果已触发，现在发送
+                    window._pendingVoiceSend = false;
+                    const text = (finalTranscript + (window._lastInterim || '')).trim();
+                    finalTranscript = '';
+                    window._lastInterim = '';
+                    if (text) sendChatMessage(text);
+                }
+            };
+        }
+
+        function startRecording() {
+            if (!speechRecognition || isRecording) return;
+            isRecording = true;
+            finalTranscript = ''; // 清空累积文本
+            document.getElementById('btn-voice').classList.add('recording');
+            document.getElementById('btn-voice').innerHTML = '⏹';
+            document.getElementById('voice-sphere-wrap').classList.add('show');
+            document.getElementById('btn-stop-voice').classList.add('show');
+            startSphereAnimation(true);
+            try { speechRecognition.start(); } catch(e) {}
+            document.getElementById('chat-status').textContent = '🔴 正在听... 想好了点击结束';
+        }
+
+        // 停止录音并发送累积的文字
+        function stopAndSendVoice() {
+            if (!isRecording) return;
+            isRecording = false;
+            document.getElementById('btn-voice').classList.remove('recording');
+            document.getElementById('btn-voice').innerHTML = '🎤';
+            document.getElementById('voice-sphere-wrap').classList.remove('show');
+            document.getElementById('btn-stop-voice').classList.remove('show');
+            startSphereAnimation(false);
+            document.getElementById('voice-interim').textContent = '';
+            document.getElementById('chat-status').textContent = '处理中...';
+            // 标记等待发送，让 onend 回调处理最终文本
+            window._pendingVoiceSend = true;
+            try { speechRecognition.stop(); } catch(e) {}
+            // 兜底：如果 300ms 后 onend 还没触发，手动发送
+            setTimeout(() => {
+                if (window._pendingVoiceSend) {
+                    window._pendingVoiceSend = false;
+                    const text = (finalTranscript + (window._lastInterim || '')).trim();
+                    finalTranscript = '';
+                    window._lastInterim = '';
+                    document.getElementById('chat-status').textContent = '对话中';
+                    if (text) sendChatMessage(text);
+                }
+            }, 500);
+        }
+
+        // 仅停止录音不发送（取消时用）
+        function stopRecordingSilent() {
+            if (!isRecording) return;
+            isRecording = false;
+            finalTranscript = '';
+            window._lastInterim = '';
+            window._pendingVoiceSend = false;
+            document.getElementById('btn-voice').classList.remove('recording');
+            document.getElementById('btn-voice').innerHTML = '🎤';
+            document.getElementById('voice-sphere-wrap').classList.remove('show');
+            document.getElementById('btn-stop-voice').classList.remove('show');
+            startSphereAnimation(false);
+            document.getElementById('voice-interim').textContent = '';
+            try { speechRecognition.stop(); } catch(e) {}
+            document.getElementById('chat-status').textContent = '对话中';
+        }
+
+        // 发送聊天消息
+        async function sendChatMessage(text) {
+            if (!text.trim() || !chatSessionId) return;
+            // 用户消息上屏
+            appendChatMsg('user', text);
+            document.getElementById('chat-text-input').value = '';
+            // 显示正在输入...
+            const typingEl = appendTyping();
+            try {
+                const r = await fetch('/api/chat/message', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ sessionId: chatSessionId, message: text })
+                });
+                const d = await r.json();
+                removeTyping(typingEl);
+                if (d.success) {
+                    appendChatMsgTyping(d.reply);
+                    chatKeywords = d.keywords || [];
+                } else {
+                    const errMsg = d.error && d.error.includes('RESOURCE_EXHAUSTED')
+                        ? '请求太频繁了，等几秒再试试～'
+                        : (d.error && d.error.includes('过期') ? '对话超时了，请重新上传图片开始' : '抱歉，AI暂时忙碌，稍后再试～');
+                    appendChatMsg('ai', errMsg);
+                }
+            } catch (e) {
+                removeTyping(typingEl);
+                appendChatMsg('ai', '网络错误，请稍后再试');
+            }
+        }
+
+        // 开始 AI 对话（上传图片后自动触发）
+        async function startAIChat(imagePaths, location) {
+            const chatSection = document.getElementById('chat-section');
+            const chatMsgs = document.getElementById('chat-messages');
+            chatSection.style.display = '';
+            chatMsgs.innerHTML = '';
+            chatKeywords = [];
+            chatSessionId = null;
+            document.getElementById('chat-title').textContent = '🦌 拾光鹿 · 回忆收集家';
+            document.getElementById('chat-status').textContent = '拾光鹿思考中...';
+
+            const typingEl = appendTyping();
+            try {
+                const r = await fetch('/api/chat/start', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ imagePaths: imagePaths || [], location: location || '' })
+                });
+                const d = await r.json();
+                removeTyping(typingEl);
+                if (d.success) {
+                    chatSessionId = d.sessionId;
+                    chatKeywords = d.keywords || [];
+                    isChatActive = true;
+                    appendChatMsgTyping(d.reply);
+                    document.getElementById('chat-status').textContent = '对话中';
+                } else {
+                    appendChatMsg('ai', 'AI 连接失败：' + (d.error || ''));
+                    document.getElementById('chat-status').textContent = '连接失败';
+                }
+            } catch (e) {
+                removeTyping(typingEl);
+                appendChatMsg('ai', '无法连接到 AI 服务，请检查网络');
+                document.getElementById('chat-status').textContent = '连接失败';
+            }
+        }
+
+        // 开始旅行计划 AI 对话（选位后自动触发）
+        async function startPlanAIChat(location) {
+            const chatSection = document.getElementById('chat-section');
+            const chatMsgs = document.getElementById('chat-messages');
+            chatSection.style.display = '';
+            chatMsgs.innerHTML = '';
+            chatKeywords = [];
+            chatSessionId = null;
+            document.getElementById('chat-title').textContent = '🐱 漫游喵 · 旅行规划师';
+            document.getElementById('chat-status').textContent = '漫游喵思考中...';
+
+            const typingEl = appendTyping();
+            try {
+                const r = await fetch('/api/chat/start-plan', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ location: location || '' })
+                });
+                const d = await r.json();
+                removeTyping(typingEl);
+                if (d.success) {
+                    chatSessionId = d.sessionId;
+                    chatKeywords = d.keywords || [];
+                    isChatActive = true;
+                    appendChatMsgTyping(d.reply);
+                    document.getElementById('chat-status').textContent = '对话中';
+                } else {
+                    appendChatMsg('ai', '漫游喵连接失败：' + (d.error || ''));
+                    document.getElementById('chat-status').textContent = '连接失败';
+                }
+            } catch (e) {
+                removeTyping(typingEl);
+                appendChatMsg('ai', '无法连接到漫游喵，请检查网络');
+                document.getElementById('chat-status').textContent = '连接失败';
+            }
+        }
+
+        // 往聊天窗口追加消息
+        // 清理AI回复中的markdown星号，保留换行
+        function cleanAIText(text) {
+            let s = (text || '').replace(/\*\*/g, '').replace(/\*/g, '');
+            // 移除泄露的 ,"keywords":[...] 等 JSON 片段
+            s = s.replace(/["']?\s*,\s*["']?keywords["']?\s*:\s*\[[\s\S]*\]\s*$/i, '').trim();
+            return s;
+        }
+
+        function appendChatMsg(role, text) {
+            const msgs = document.getElementById('chat-messages');
+            const div = document.createElement('div');
+            div.className = 'chat-msg ' + role;
+            const avatar = document.createElement('div');
+            avatar.className = 'chat-avatar';
+            avatar.textContent = role === 'ai' ? '✨' : '🧑';
+            const bubble = document.createElement('div');
+            bubble.className = 'chat-bubble';
+            bubble.textContent = role === 'ai' ? cleanAIText(text) : text;
+            if (role === 'ai') { div.appendChild(avatar); div.appendChild(bubble); }
+            else { div.appendChild(bubble); div.appendChild(avatar); }
+            msgs.appendChild(div);
+            msgs.scrollTop = msgs.scrollHeight;
+        }
+        // AI 打字式回复（逐字显示 + 光标闪烁）
+        function appendChatMsgTyping(text, onComplete) {
+            const msgs = document.getElementById('chat-messages');
+            const div = document.createElement('div');
+            div.className = 'chat-msg ai';
+            const avatar = document.createElement('div');
+            avatar.className = 'chat-avatar';
+            avatar.textContent = '✨';
+            const bubble = document.createElement('div');
+            bubble.className = 'chat-bubble typing-active';
+            const textSpan = document.createElement('span');
+            const cursorSpan = document.createElement('span');
+            cursorSpan.className = 'typing-cursor';
+            cursorSpan.setAttribute('aria-hidden', 'true');
+            div.appendChild(avatar);
+            bubble.appendChild(textSpan);
+            bubble.appendChild(cursorSpan);
+            div.appendChild(bubble);
+            msgs.appendChild(div);
+            const full = cleanAIText(text || '');
+            let i = 0;
+            const step = 2;
+            const interval = 35; // 约 0.8x 速率
+            function tick() {
+                if (i >= full.length) {
+                    cursorSpan.remove();
+                    bubble.classList.remove('typing-active');
+                    if (onComplete) onComplete();
+                    return;
+                }
+                i = Math.min(i + step, full.length);
+                textSpan.textContent = full.slice(0, i);
+                msgs.scrollTop = msgs.scrollHeight;
+                setTimeout(tick, interval);
+            }
+            tick();
+        }
+        function appendTyping() {
+            const msgs = document.getElementById('chat-messages');
+            const div = document.createElement('div');
+            div.className = 'chat-msg ai';
+            div.innerHTML = '<div class="chat-avatar">✨</div><div class="chat-bubble"><div class="chat-typing"><span></span><span></span><span></span></div></div>';
+            msgs.appendChild(div);
+            msgs.scrollTop = msgs.scrollHeight;
+            return div;
+        }
+        function removeTyping(el) { if (el && el.parentNode) el.parentNode.removeChild(el); }
+
+        // ==================== 紫色粒子球动画 ====================
+        function startSphereAnimation(active) {
+            const canvas = document.getElementById('voice-sphere-canvas');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            const w = canvas.width, h = canvas.height;
+            const cx = w / 2, cy = h / 2, maxR = 60;
+
+            if (!active) {
+                if (sphereAnimId) { cancelAnimationFrame(sphereAnimId); sphereAnimId = null; }
+                ctx.clearRect(0, 0, w, h);
+                sphereParticles = [];
+                return;
+            }
+
+            // 初始化粒子
+            if (sphereParticles.length === 0) {
+                const SPHERE_COLORS = [
+                    [167,139,179], [128,96,176], [192,160,224], [96,64,160],
+                    [180,150,220], [140,100,200], [200,180,240], [160,120,210]
+                ];
+                // 外层旋转粒子
+                for (let i = 0; i < 1500; i++) {
+                    const theta = Math.random() * Math.PI * 2;
+                    const phi = Math.acos(2 * Math.random() - 1);
+                    const r = maxR * (0.85 + Math.random() * 0.25);
+                    sphereParticles.push({
+                        theta, phi, r,
+                        speed: (0.3 + Math.random() * 0.7) * (Math.random() > 0.5 ? 1 : -1),
+                        size: 0.5 + Math.random() * 1.2,
+                        color: SPHERE_COLORS[Math.floor(Math.random() * SPHERE_COLORS.length)],
+                        alpha: 0.3 + Math.random() * 0.6,
+                        type: 'orbit'
+                    });
+                }
+                // 中心浮现粒子
+                for (let i = 0; i < 500; i++) {
+                    sphereParticles.push({
+                        x: (Math.random() - 0.5) * maxR * 0.8,
+                        y: (Math.random() - 0.5) * maxR * 0.8,
+                        vx: (Math.random() - 0.5) * 0.5,
+                        vy: (Math.random() - 0.5) * 0.5,
+                        size: 0.8 + Math.random() * 1.5,
+                        color: SPHERE_COLORS[Math.floor(Math.random() * SPHERE_COLORS.length)],
+                        alpha: Math.random() * 0.6,
+                        life: Math.random() * 3,
+                        maxLife: 1 + Math.random() * 3,
+                        type: 'center'
+                    });
+                }
+            }
+
+            const startTime = performance.now();
+            function animSphere() {
+                const t = (performance.now() - startTime) / 1000;
+                ctx.clearRect(0, 0, w, h);
+
+                // 中心光晕
+                const glowR = maxR * 0.6;
+                const glow = ctx.createRadialGradient(cx, cy, 0, cx, cy, glowR);
+                glow.addColorStop(0, `rgba(160,120,220,${0.15 + 0.05 * Math.sin(t * 2)})`);
+                glow.addColorStop(0.5, 'rgba(120,80,180,0.05)');
+                glow.addColorStop(1, 'rgba(100,60,160,0)');
+                ctx.fillStyle = glow;
+                ctx.beginPath(); ctx.arc(cx, cy, glowR, 0, Math.PI * 2); ctx.fill();
+
+                for (const p of sphereParticles) {
+                    if (p.type === 'orbit') {
+                        // 外层旋转
+                        p.theta += p.speed * 0.015;
+                        const x3d = p.r * Math.sin(p.phi) * Math.cos(p.theta);
+                        const y3d = p.r * Math.cos(p.phi);
+                        const z3d = p.r * Math.sin(p.phi) * Math.sin(p.theta);
+                        const depth = (z3d + p.r) / (2 * p.r); // 0~1
+                        const px = cx + x3d;
+                        const py = cy + y3d;
+                        const a = p.alpha * (0.2 + 0.8 * depth);
+                        if (a < 0.02) continue;
+                        const [r, g, b] = p.color;
+                        ctx.fillStyle = `rgba(${r},${g},${b},${a})`;
+                        ctx.beginPath();
+                        ctx.arc(px, py, p.size * (0.5 + 0.5 * depth), 0, Math.PI * 2);
+                        ctx.fill();
+                    } else {
+                        // 中心浮现
+                        p.life -= 0.016;
+                        p.x += p.vx; p.y += p.vy;
+                        if (p.life <= 0) {
+                            p.x = (Math.random() - 0.5) * maxR * 0.6;
+                            p.y = (Math.random() - 0.5) * maxR * 0.6;
+                            p.vx = (Math.random() - 0.5) * 0.5;
+                            p.vy = (Math.random() - 0.5) * 0.5;
+                            p.life = p.maxLife;
+                            p.alpha = Math.random() * 0.6;
+                        }
+                        const fadeIn = Math.min(1, (p.maxLife - p.life) / 0.5);
+                        const fadeOut = Math.min(1, p.life / 0.5);
+                        const a = p.alpha * fadeIn * fadeOut;
+                        if (a < 0.02) continue;
+                        const [r, g, b] = p.color;
+                        ctx.fillStyle = `rgba(${r},${g},${b},${a})`;
+                        ctx.beginPath();
+                        ctx.arc(cx + p.x, cy + p.y, p.size, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                }
+                sphereAnimId = requestAnimationFrame(animSphere);
+            }
+            if (sphereAnimId) cancelAnimationFrame(sphereAnimId);
+            animSphere();
+        }
+
+        // ==================== 表单 ====================
+        function showForm(lat, lon, locationLabel) {
+            const isPlan = formMode === 'plan';
+            // 标题
+            document.querySelector('#form-box h3').textContent = isPlan ? '添加旅行计划' : '添加旅行记录';
+            // 图片区域显隐
+            document.getElementById('image-section').style.display = isPlan ? 'none' : '';
+            // AI 聊天区域：两种模式都支持，初始隐藏（记录模式上传图片后显示，计划模式选位后显示）
+            document.getElementById('chat-section').style.display = 'none';
+            document.getElementById('chat-messages').innerHTML = '';
+            chatSessionId = null; isChatActive = false; chatKeywords = []; uploadedImagePaths = [];
+            // 坐标提示
+            let coordText = isPlan
+                ? '尚未定位 — 点击下方「地图定位」选择目的地'
+                : '尚未定位 — 上传含GPS的照片或点击下方「地图定位」';
+            if(lat!==null) {
+                coordText = `经纬度：${lat.toFixed(4)}°, ${lon.toFixed(4)}°`;
+                if(locationLabel) coordText += ` · ${locationLabel}`;
+            }
+            document.getElementById('coord-display').textContent = coordText;
+            document.getElementById('desc-input').value='';
+            document.getElementById('desc-input').placeholder = isPlan ? '写下你的旅行计划（可选，AI会帮你总结）...' : '写下你的旅行感受（可选，AI会帮你补充）...';
+            document.getElementById('image-input').value='';
+            document.getElementById('image-count').textContent='';
+            document.getElementById('gps-hint').textContent='';
+            document.getElementById('city-search-input').value = '';
+            // 日期选择器：旅行记录显示，计划隐藏
+            document.getElementById('date-section').style.display = isPlan ? 'none' : '';
+            document.getElementById('photo-date').value = '';
+            document.getElementById('form-overlay').classList.add('show');
+        }
+        function hideForm() {
+            document.getElementById('form-overlay').classList.remove('show');
+            pendingRecord=null;
+            // 停止语音和粒子球
+            if (isRecording) stopRecordingSilent();
+            startSphereAnimation(false);
+            chatSessionId = null; isChatActive = false;
+            window._continuingRecordId = null;
+            window._continuingType = null;
+            // 如果正在选位模式也一并退出
+            if(awaitingLocationClick) {
+                awaitingLocationClick=false;
+                pickedLocation=null;
+                document.getElementById('pick-hint').classList.remove('show');
+                hideLocConfirm();
+            }
+        }
+
+        async function onSaveRecord() {
+            // 防止重复点击：立即禁用保存按钮并显示加载状态
+            const saveBtn = document.getElementById('btn-save');
+            if (saveBtn.disabled) return; // 已在保存中，直接忽略
+            saveBtn.disabled = true;
+            saveBtn.textContent = '保存中...';
+            saveBtn.style.opacity = '0.6';
+            saveBtn.style.cursor = 'not-allowed';
+            const restoreBtn = () => { saveBtn.disabled = false; saveBtn.textContent = '保存'; saveBtn.style.opacity = '1'; saveBtn.style.cursor = 'pointer'; };
+            const desc=document.getElementById('desc-input').value.trim();
+            // 继续聊天模式不需要检查 pendingRecord
+            if(!pendingRecord && !window._continuingRecordId){alert('请先选择位置（使用地图定位）');restoreBtn();return;}
+
+            // 继续聊天模式：更新已有记录/计划的聊天数据
+            if (window._continuingRecordId) {
+                const id = window._continuingRecordId;
+                const type = window._continuingType || 'record';
+                const endpoint = type === 'plan' ? `/api/plans/${id}/chat` : `/api/records/${id}/chat`;
+                if (!chatSessionId) {
+                    alert('对话会话已断开，请重新打开记录继续聊天');
+                    window._continuingRecordId = null;
+                    window._continuingType = null;
+                    restoreBtn(); return;
+                }
+                try {
+                    const r = await fetch(endpoint, {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ chatSessionId })
+                    });
+                    const d = await r.json();
+                    if (d.success) {
+                        const markers = type === 'plan' ? planMarkers : recordsMarkers;
+                        const marker = markers.find(m => {
+                            const data = type === 'plan' ? m.userData?.plan : m.userData?.record;
+                            return data && data.id === id;
+                        });
+                        if (marker) {
+                            const updated = type === 'plan' ? d.plan : d.record;
+                            if (type === 'plan') marker.userData.plan = updated;
+                            else marker.userData.record = updated;
+                        }
+                        window._continuingRecordId = null;
+                        window._continuingType = null;
+                        hideForm();
+                        alert('对话已更新保存！');
+                    } else { alert('保存失败：' + (d.error || '')); restoreBtn(); }
+                } catch(e) { console.error('继续聊天保存失败:', e); alert('保存失败：网络错误'); restoreBtn(); }
+                return;
+            }
+
+            if(formMode === 'plan') {
+                // 有 AI 对话时可以不填描述（后端会生成 AI 总结）
+                const planDesc = desc || (isChatActive && chatSessionId ? '（AI 将自动生成计划摘要）' : '');
+                if(!planDesc){alert('请输入计划描述或先与AI聊天');restoreBtn();return;}
+                // 保存旅行计划（含AI聊天数据）
+                const plan={
+                    lat:pendingRecord.lat, lon:pendingRecord.lon,
+                    description:planDesc,
+                    chatSessionId: chatSessionId || undefined
+                };
+                try{
+                    const r=await fetch('/api/plans',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(plan)});
+                    const d=await r.json();
+                    if(d.success){createPlanSprite(plan.lat,plan.lon,d.plan);hideForm();alert('✓ 计划保存成功！');}
+                    else {alert('保存失败：'+(d.error||'未知'));restoreBtn();}
+                }catch(e){alert('保存失败');restoreBtn();}
+            } else {
+                // 保存旅行记录（含图片 + AI 聊天数据）
+                // 先上传图片（如果还没上传过）
+                const imageInput=document.getElementById('image-input');
+                let imagePaths = uploadedImagePaths.length > 0 ? uploadedImagePaths : [];
+                if(imagePaths.length === 0 && imageInput.files && imageInput.files.length > 0){
+                    const fd=new FormData();
+                    for(let i=0; i<imageInput.files.length; i++) fd.append('images', imageInput.files[i]);
+                    try{
+                        const r=await fetch('/api/upload',{method:'POST',body:fd});
+                        const d=await r.json();
+                        if(d.paths) imagePaths=d.paths;
+                        else if(d.error) { alert('图片上传失败：' + d.error); restoreBtn(); return; }
+                    } catch(e){alert('图片上传失败，请检查文件大小和格式');restoreBtn();return;}
+                }
+                // 有 AI 对话时可以不填描述（后端会生成 AI 总结）；无 AI 对话则必须填描述
+                const descText = desc || (isChatActive && chatSessionId ? '（AI 将自动生成日记）' : '');
+                if(!descText){alert('请输入文字描述或先与AI聊天');restoreBtn();return;}
+                const photoDate = document.getElementById('photo-date').value || undefined;
+                const record={
+                    lat:pendingRecord.lat, lon:pendingRecord.lon,
+                    description:descText,
+                    imagePaths: imagePaths.length>0 ? imagePaths : undefined,
+                    chatSessionId: chatSessionId || undefined, // 后端会从中提取 keywords 和 chatLog
+                    photoDate // 拍摄日期（YYYY-MM-DD），用于获取历史天气
+                };
+                try{
+                    const r=await fetch('/api/records',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(record)});
+                    const d=await r.json();
+                    if(d.success){createMailboxSprite(record.lat,record.lon,d.record);hideForm();alert('✓ 旅行记录保存成功！');}
+                    else {alert('保存失败：'+(d.error||'未知'));restoreBtn();}
+                }catch(e){alert('保存失败');restoreBtn();}
+            }
+        }
+
+        async function loadRecords() {
+            try{
+                const r=await fetch('/api/records');const records=await r.json();
+                records.forEach(rec=>createMailboxSprite(rec.lat,rec.lon,rec));
+            }catch(e){console.warn('加载记录失败',e);}
+        }
+
+        async function loadPlans() {
+            try{
+                const r=await fetch('/api/plans');const plans=await r.json();
+                plans.forEach(p=>createPlanSprite(p.lat,p.lon,p));
+            }catch(e){console.warn('加载计划失败',e);}
+        }
+
+        // ==================== resize ====================
+        function onWindowResize() {
+            camera.aspect=innerWidth/innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(innerWidth,innerHeight);
+            borderLineMaterials.forEach(m=>{m.resolution.set(innerWidth,innerHeight);});
+        }
+
+        // ==================== 渲染循环 ====================
+        function animate() {
+            requestAnimationFrame(animate);
+            if(earthGroup){
+                earthGroup.rotation.y+=(targetRotationY-earthGroup.rotation.y)*.05;
+                earthGroup.rotation.x+=(targetRotationX-earthGroup.rotation.x)*.05;
+                if(!isDragging) targetRotationY+=.0002;
+            }
+            const zoomed = camera.position.z < ZOOM_THRESHOLD;
+            continentLabels.forEach(s=>{s.visible=!zoomed;});
+            countryLabels.forEach(s=>{s.visible=zoomed;});
+
+            // 动态轮廓线粗细
+            if(borderLineMaterials.length > 0) {
+                const t = Math.max(0, Math.min(1, (camera.position.z - 350) / (900 - 350)));
+                borderLineMaterials[0].linewidth = 0.5 + 0.5 * t;
+            }
+            // 高亮国境线的分辨率需随窗口更新
+            if(highlightBorderGroup) highlightBorderGroup.traverse(o=>{ if(o.material&&o.material.resolution) o.material.resolution.set(innerWidth,innerHeight); });
+
+            // 放大时：粒子变暗50% + 显示额外粒子（1.5倍）
+            if(particleMaterial) {
+                const targetB = zoomed ? 0.3 : 1.0;
+                const targetShow = zoomed ? 1.0 : 0.0;
+                particleMaterial.uniforms.brightness.value += (targetB - particleMaterial.uniforms.brightness.value) * 0.05;
+                particleMaterial.uniforms.showExtra.value += (targetShow - particleMaterial.uniforms.showExtra.value) * 0.05;
+            }
+
+            drawLatAxis();
+            renderer.render(scene,camera);
+        }
+    </script>
+</body>
+</html>
