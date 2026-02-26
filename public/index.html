@@ -1775,6 +1775,19 @@
             return [];
         }
 
+        function isCloudinaryUrl(url) {
+            return typeof url === 'string' && /res\.cloudinary\.com/i.test(url);
+        }
+
+        function toCloudinaryJpgUrl(url) {
+            if (!isCloudinaryUrl(url)) return url;
+            // Cloudinary 动态格式转换：线上 HEIC 统一转 JPG 再展示
+            const withTransform = url.includes('/upload/')
+                ? url.replace('/upload/', '/upload/f_jpg,q_auto/')
+                : url;
+            return withTransform.replace(/\.(heic|heif)(\?.*)?$/i, '.jpg$2');
+        }
+
         // ==================== 信封详情（深紫信封 + 宝丽来 + 粒子 + 天气 + 撤回） ====================
         // 颜色主题配置
         const DETAIL_THEMES = {
@@ -1865,9 +1878,14 @@
                 img.alt = `照片 ${i+1}`;
                 const isHeic = /\.(heic|heif)$/i.test(src);
                 if (isHeic) {
-                    // HEIC：通过服务端 sips 转 JPEG 显示（比前端 heic2any 更可靠）
-                    const filename = src.split('/').pop();
-                    img.src = `/api/heic-preview/${encodeURIComponent(filename)}`;
+                    if (isCloudinaryUrl(src)) {
+                        // 云端 HEIC：使用 Cloudinary 转 JPG 后的 URL
+                        img.src = toCloudinaryJpgUrl(src);
+                    } else {
+                        // 本地 HEIC：通过服务端转换后显示
+                        const filename = src.split('/').pop();
+                        img.src = `/api/heic-preview/${encodeURIComponent(filename)}`;
+                    }
                     img.onerror = () => { img.style.background='linear-gradient(135deg,#ddd,#bbb)'; img.alt='HEIC 照片加载失败'; img.style.minHeight='120px'; };
                 } else {
                     img.src = src;
