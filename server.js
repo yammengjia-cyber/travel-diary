@@ -387,6 +387,15 @@ app.get('/health', (req, res) => {
   res.status(200).json({ ok: true });
 });
 
+function getRequestUserId(req) {
+  const fromQuery = typeof req.query?.userId === 'string' ? req.query.userId.trim() : '';
+  const fromBody = typeof req.body?.userId === 'string' ? req.body.userId.trim() : '';
+  const fromHeader = typeof req.headers['x-anon-user-id'] === 'string' ? req.headers['x-anon-user-id'].trim() : '';
+  const raw = fromQuery || fromBody || fromHeader;
+  if (!raw) return '';
+  return raw.slice(0, 120);
+}
+
 // ========== HEIC 转 JPEG 服务端接口（macOS sips 转换，带缓存） ==========
 const { execSync } = require('child_process');
 app.get('/api/heic-preview/:filename', (req, res) => {
@@ -519,10 +528,13 @@ app.post('/api/upload', (req, res) => {
 
 // ========== 读取旅行记录 ==========
 app.get('/api/records', (req, res) => {
+  const userId = getRequestUserId(req);
+  if (!userId) return res.status(400).json({ error: '缺少 userId' });
   try {
     const data = fs.readFileSync(DB_PATH, 'utf-8');
     const json = JSON.parse(data);
-    res.json(json.records || []);
+    const records = (json.records || []).filter(r => r && r.userId === userId);
+    res.json(records);
   } catch (err) {
     if (err.code === 'ENOENT') res.json([]);
     else res.status(500).json({ error: '读取失败' });
@@ -532,6 +544,9 @@ app.get('/api/records', (req, res) => {
 // ========== 保存旅行记录（自动获取天气） ==========
 app.post('/api/records', async (req, res) => {
   const record = req.body;
+  const userId = getRequestUserId(req);
+  if (!userId) return res.status(400).json({ error: '缺少 userId' });
+  record.userId = userId;
   if (record.lat == null || record.lon == null || !record.description) {
     return res.status(400).json({ error: '缺少 lat、lon 或 description' });
   }
@@ -741,11 +756,13 @@ app.post('/api/records/refresh-characters', async (req, res) => {
 
 // ========== 更新记录/计划的聊天数据（继续聊天后保存） ==========
 app.patch('/api/records/:id/chat', async (req, res) => {
+  const userId = getRequestUserId(req);
+  if (!userId) return res.status(400).json({ error: '缺少 userId' });
   const { chatSessionId } = req.body;
   try {
     let db = { records: [] };
     if (fs.existsSync(DB_PATH)) db = JSON.parse(fs.readFileSync(DB_PATH, 'utf-8'));
-    const rec = db.records.find(r => r.id === req.params.id);
+    const rec = db.records.find(r => r.id === req.params.id && r.userId === userId);
     if (!rec) return res.status(404).json({ error: '记录不存在' });
     if (chatSessionId) {
       const session = chatSessions.get(chatSessionId);
@@ -769,12 +786,14 @@ app.patch('/api/records/:id/chat', async (req, res) => {
 });
 
 app.patch('/api/plans/:id/chat', async (req, res) => {
+  const userId = getRequestUserId(req);
+  if (!userId) return res.status(400).json({ error: '缺少 userId' });
   const { chatSessionId } = req.body;
   try {
     let db = { records: [], plans: [] };
     if (fs.existsSync(DB_PATH)) db = JSON.parse(fs.readFileSync(DB_PATH, 'utf-8'));
     if (!db.plans) db.plans = [];
-    const plan = db.plans.find(p => p.id === req.params.id);
+    const plan = db.plans.find(p => p.id === req.params.id && p.userId === userId);
     if (!plan) return res.status(404).json({ error: '计划不存在' });
     if (chatSessionId) {
       const session = chatSessions.get(chatSessionId);
@@ -798,12 +817,14 @@ app.patch('/api/plans/:id/chat', async (req, res) => {
 
 // ========== 删除旅行记录 ==========
 app.delete('/api/records/:id', (req, res) => {
+  const userId = getRequestUserId(req);
+  if (!userId) return res.status(400).json({ error: '缺少 userId' });
   try {
     let db = { records: [] };
     if (fs.existsSync(DB_PATH)) {
       db = JSON.parse(fs.readFileSync(DB_PATH, 'utf-8'));
     }
-    const idx = db.records.findIndex(r => r.id === req.params.id);
+    const idx = db.records.findIndex(r => r.id === req.params.id && r.userId === userId);
     if (idx === -1) return res.status(404).json({ error: '记录不存在' });
     db.records.splice(idx, 1);
     fs.writeFileSync(DB_PATH, JSON.stringify(db, null, 2));
@@ -815,10 +836,13 @@ app.delete('/api/records/:id', (req, res) => {
 
 // ========== 读取旅行计划 ==========
 app.get('/api/plans', (req, res) => {
+  const userId = getRequestUserId(req);
+  if (!userId) return res.status(400).json({ error: '缺少 userId' });
   try {
     const data = fs.readFileSync(DB_PATH, 'utf-8');
     const json = JSON.parse(data);
-    res.json(json.plans || []);
+    const plans = (json.plans || []).filter(p => p && p.userId === userId);
+    res.json(plans);
   } catch (err) {
     if (err.code === 'ENOENT') res.json([]);
     else res.status(500).json({ error: '读取失败' });
@@ -828,6 +852,9 @@ app.get('/api/plans', (req, res) => {
 // ========== 保存旅行计划（含AI聊天数据） ==========
 app.post('/api/plans', async (req, res) => {
   const plan = req.body;
+  const userId = getRequestUserId(req);
+  if (!userId) return res.status(400).json({ error: '缺少 userId' });
+  plan.userId = userId;
   if (plan.lat == null || plan.lon == null || !plan.description) {
     return res.status(400).json({ error: '缺少 lat、lon 或 description' });
   }
@@ -884,13 +911,15 @@ app.post('/api/plans', async (req, res) => {
 
 // ========== 删除旅行计划 ==========
 app.delete('/api/plans/:id', (req, res) => {
+  const userId = getRequestUserId(req);
+  if (!userId) return res.status(400).json({ error: '缺少 userId' });
   try {
     let db = { records: [], plans: [] };
     if (fs.existsSync(DB_PATH)) {
       db = JSON.parse(fs.readFileSync(DB_PATH, 'utf-8'));
       if (!db.plans) db.plans = [];
     }
-    const idx = db.plans.findIndex(p => p.id === req.params.id);
+    const idx = db.plans.findIndex(p => p.id === req.params.id && p.userId === userId);
     if (idx === -1) return res.status(404).json({ error: '计划不存在' });
     db.plans.splice(idx, 1);
     fs.writeFileSync(DB_PATH, JSON.stringify(db, null, 2));

@@ -512,6 +512,20 @@
         const WEATHER_DESC = {0:'☀️ 晴',1:'🌤 少云',2:'⛅ 多云',3:'☁️ 阴',45:'🌫 雾',48:'🌫 浓雾',51:'🌦 小雨',53:'🌦 中雨',55:'🌦 大雨',61:'🌧 小雨',63:'🌧 中雨',65:'🌧 大雨',71:'🌨 小雪',73:'🌨 中雪',75:'🌨 大雪',80:'🌦 阵雨',81:'🌦 阵雨',82:'🌦 强阵雨',95:'⛈ 雷暴',96:'⛈ 冰雹',99:'⛈ 冰雹'};
         function getWeatherDesc(code) { return WEATHER_DESC[code] || ('天气代码 ' + code); }
 
+        // 每台设备一个匿名 ID（用于数据隔离）
+        const ANON_USER_ID_KEY = 'travelDiaryAnonymousUserId';
+        function getOrCreateAnonymousUserId() {
+            const existing = localStorage.getItem(ANON_USER_ID_KEY);
+            if (existing && existing.trim()) return existing.trim();
+            const fallback = 'anon-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
+            const id = (window.crypto && window.crypto.randomUUID)
+                ? ('anon-' + window.crypto.randomUUID())
+                : fallback;
+            localStorage.setItem(ANON_USER_ID_KEY, id);
+            return id;
+        }
+        const anonymousUserId = getOrCreateAnonymousUserId();
+
         // ==================== 加载邮箱纹理（去除深蓝背景） ====================
         function loadMailboxTex() {
             return new Promise(resolve => {
@@ -2083,7 +2097,7 @@
                 if(!plan || !plan.id) { alert('无法取消：计划信息缺失'); return; }
                 if(!confirm('确定要取消这个旅行计划吗？')) return;
                 try {
-                    const r = await fetch('/api/plans/' + plan.id, { method:'DELETE' });
+                    const r = await fetch('/api/plans/' + plan.id + '?userId=' + encodeURIComponent(anonymousUserId), { method:'DELETE' });
                     const d = await r.json();
                     if(d.success) {
                         earthGroup.remove(currentDetailGroup);
@@ -2098,7 +2112,7 @@
                 if(!rec || !rec.id) { alert('无法撤回：记录信息缺失'); return; }
                 if(!confirm('确定要撤回这个信箱吗？此操作不可恢复。')) return;
                 try {
-                    const r = await fetch('/api/records/' + rec.id, { method:'DELETE' });
+                    const r = await fetch('/api/records/' + rec.id + '?userId=' + encodeURIComponent(anonymousUserId), { method:'DELETE' });
                     const d = await r.json();
                     if(d.success) {
                         earthGroup.remove(currentDetailGroup);
@@ -2592,7 +2606,7 @@
                     const r = await fetch(endpoint, {
                         method: 'PATCH',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ chatSessionId })
+                        body: JSON.stringify({ chatSessionId, userId: anonymousUserId })
                     });
                     const d = await r.json();
                     if (d.success) {
@@ -2623,7 +2637,8 @@
                 const plan={
                     lat:pendingRecord.lat, lon:pendingRecord.lon,
                     description:planDesc,
-                    chatSessionId: chatSessionId || undefined
+                    chatSessionId: chatSessionId || undefined,
+                    userId: anonymousUserId
                 };
                 try{
                     const r=await fetch('/api/plans',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(plan)});
@@ -2655,7 +2670,8 @@
                     description:descText,
                     imagePaths: imagePaths.length>0 ? imagePaths : undefined,
                     chatSessionId: chatSessionId || undefined, // 后端会从中提取 keywords 和 chatLog
-                    photoDate // 拍摄日期（YYYY-MM-DD），用于获取历史天气
+                    photoDate, // 拍摄日期（YYYY-MM-DD），用于获取历史天气
+                    userId: anonymousUserId
                 };
                 try{
                     const r=await fetch('/api/records',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(record)});
@@ -2668,14 +2684,14 @@
 
         async function loadRecords() {
             try{
-                const r=await fetch('/api/records');const records=await r.json();
+                const r=await fetch('/api/records?userId=' + encodeURIComponent(anonymousUserId));const records=await r.json();
                 records.forEach(rec=>createMailboxSprite(rec.lat,rec.lon,rec));
             }catch(e){console.warn('加载记录失败',e);}
         }
 
         async function loadPlans() {
             try{
-                const r=await fetch('/api/plans');const plans=await r.json();
+                const r=await fetch('/api/plans?userId=' + encodeURIComponent(anonymousUserId));const plans=await r.json();
                 plans.forEach(p=>createPlanSprite(p.lat,p.lon,p));
             }catch(e){console.warn('加载计划失败',e);}
         }
