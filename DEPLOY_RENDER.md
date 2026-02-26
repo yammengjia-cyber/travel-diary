@@ -23,6 +23,7 @@
 - `GEMINI_API_KEY` = 你的 Gemini API Key
 - `DEEPSEEK_API_KEY` = 你的 DeepSeek API Key（可选，配置后文本聊天优先走国内可达接口）
 - `CLOUDINARY_CLOUD_NAME` / `CLOUDINARY_API_KEY` / `CLOUDINARY_API_SECRET`（可选，配置后上传照片会存云端，避免实例重启后丢图）
+- `ENABLE_CHIBI_FEATURES` = `false`（可选，如果国内网络下 Gemini 不可达，建议关闭 Q版人物生成功能）
 
 不要把真实密钥写进仓库，也不要提交 `.env` 文件。
 

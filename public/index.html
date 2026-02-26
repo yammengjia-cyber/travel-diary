@@ -1821,17 +1821,12 @@
             const chibiWrap = document.getElementById('envelope-chibi-wrap');
             if (chibiWrap) {
                 const chibiPaths = rec.chibiImagePaths || (rec.chibiImagePath ? [rec.chibiImagePath] : []);
-                const styles = rec.characterStyles || [];
                 if (currentDetailType === 'record' && chibiPaths.length > 0) {
                     // 显示 AI 生成的透明底角色图片（支持多人）
                     chibiWrap.style.display = 'flex';
                     chibiWrap.innerHTML = chibiPaths.map((p, i) =>
                         `<div class="chibi-item chibi-ai-img" style="animation-delay:${i * 0.15}s"><img src="${p}" alt="Q版角色${i+1}" onerror="this.parentElement.style.display='none'"/></div>`
                     ).join('');
-                } else if (currentDetailType === 'record' && styles.length > 0) {
-                    // 回退：用 SVG 模板 + AI 提取的颜色特征渲染
-                    chibiWrap.style.display = 'flex';
-                    chibiWrap.innerHTML = styles.slice(0, 3).map(s => `<div class="chibi-item">${renderChibiCharacter(s)}</div>`).join('');
                 } else {
                     chibiWrap.style.display = 'none';
                     chibiWrap.innerHTML = '';

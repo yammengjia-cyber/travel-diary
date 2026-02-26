@@ -20,14 +20,22 @@ const CLOUDINARY_CLOUD_NAME = (process.env.CLOUDINARY_CLOUD_NAME || '').trim();
 const CLOUDINARY_API_KEY = (process.env.CLOUDINARY_API_KEY || '').trim();
 const CLOUDINARY_API_SECRET = (process.env.CLOUDINARY_API_SECRET || '').trim();
 const CLOUDINARY_FOLDER = (process.env.CLOUDINARY_FOLDER || 'travel-diary').trim();
+const ENABLE_CHIBI_FEATURES = (process.env.ENABLE_CHIBI_FEATURES || 'true').toLowerCase() === 'true';
 const genAI = GEMINI_API_KEY ? new GoogleGenAI({ apiKey: GEMINI_API_KEY }) : null;
 const cloudinaryEnabled = Boolean(CLOUDINARY_CLOUD_NAME && CLOUDINARY_API_KEY && CLOUDINARY_API_SECRET);
+let chibiFeatureAvailable = ENABLE_CHIBI_FEATURES && Boolean(genAI);
 if (cloudinaryEnabled) {
   cloudinary.config({
     cloud_name: CLOUDINARY_CLOUD_NAME,
     api_key: CLOUDINARY_API_KEY,
     api_secret: CLOUDINARY_API_SECRET
   });
+}
+function disableChibiFeature(reason) {
+  if (chibiFeatureAvailable) {
+    console.warn(`[Q版] 功能已停用：${reason}`);
+  }
+  chibiFeatureAvailable = false;
 }
 const chatSessions = new Map(); // 会话存储 sessionId -> { chat, history, keywords }
 const SESSION_TTL = 15 * 60 * 1000; // 15分钟过期
@@ -195,6 +203,7 @@ async function scanPersonsInPhotos(imagePaths) {
 
 // 辅助：分析单张照片中的人物，返回描述数组
 async function _describePersons(photoData, photoMime) {
+  if (!chibiFeatureAvailable) return [];
   const prompt = `Analyze this photo carefully.
 If there are NO people visible (only scenery/animals/buildings/diagrams), reply with exactly: NO_PERSON
 
@@ -217,6 +226,7 @@ Maximum 3 people. Be very specific about colors and styles. Output ONLY descript
     if (persons.length === 0 && text.length > 20) return [text]; // 单人时可能没有分隔符
     return persons;
   } catch (e) {
+    disableChibiFeature((e.message || 'Gemini 不可用').substring(0, 120));
     console.warn('[Q版扫描] 人物分析失败:', (e.message || '').substring(0, 80));
     return [];
   }
@@ -233,6 +243,7 @@ const CHIBI_POSES = [
 ];
 
 async function generateSingleChibi(photoPath, personDescription, recordId, personIndex) {
+  if (!chibiFeatureAvailable) return null;
   const MAX_RETRIES = 2;
 
   let photoData;
@@ -299,6 +310,7 @@ CRITICAL REQUIREMENTS:
       const textParts = parts.filter(p => p.text).map(p => p.text).join('');
       console.warn('[Q版图片] 无图片数据:', textParts.substring(0, 80));
     } catch (e) {
+      disableChibiFeature((e.message || 'Gemini 不可用').substring(0, 120));
       console.warn(`[Q版图片] person${personIndex} 失败:`, (e.message || '').substring(0, 80));
       if (e.status === 429) await new Promise(r => setTimeout(r, 4000));
     }
@@ -408,6 +420,7 @@ async function removeWhiteBackground(imgBuffer) {
 
 // 组合入口：为一条记录生成所有 chibi 角色
 async function generateAllChibis(imagePaths, recordId) {
+  if (!chibiFeatureAvailable) return [];
   console.log(`[Q版] 开始处理记录 ${recordId}，共 ${imagePaths.length} 张照片`);
 
   // Step 1: 扫描所有照片中的人物
@@ -724,7 +737,7 @@ app.post('/api/records', async (req, res) => {
 
     // ---- 后台异步：人物特征提取 ----
     const imagePaths = record.imagePaths || (record.imagePath ? [record.imagePath] : []);
-    if (imagePaths.length > 0) {
+    if (imagePaths.length > 0 && chibiFeatureAvailable) {
       (async () => {
         try {
           const firstPath = imagePaths[0].startsWith('/') ? imagePaths[0].slice(1) : imagePaths[0];
@@ -751,6 +764,7 @@ app.post('/api/records', async (req, res) => {
             }
           }
         } catch (e) {
+          disableChibiFeature((e.message || 'Gemini 不可用').substring(0, 120));
           console.warn('[Q版] 后台特征提取失败:', e.message);
         }
       })();
@@ -777,7 +791,7 @@ app.post('/api/records', async (req, res) => {
 
     // ---- 后台异步：为有人物的照片生成 AI Q版角色透明底图片 ----
     const imgs = record.imagePaths || [];
-    if (imgs.length > 0) {
+    if (imgs.length > 0 && chibiFeatureAvailable) {
       generateAllChibis(imgs, record.id).then(imagePaths => {
         if (imagePaths.length > 0) {
           try {
@@ -800,6 +814,7 @@ app.post('/api/records', async (req, res) => {
 
 // ========== 批量生成 Q版角色透明底图片 ==========
 app.post('/api/records/refresh-characters', async (req, res) => {
+  if (!chibiFeatureAvailable) return res.json({ success: true, updated: 0, skipped: true });
   try {
     let db = { records: [] };
     if (fs.existsSync(DB_PATH)) db = JSON.parse(fs.readFileSync(DB_PATH, 'utf-8'));
