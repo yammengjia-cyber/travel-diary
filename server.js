@@ -533,6 +533,17 @@ app.get('/api/records', (req, res) => {
   try {
     const data = fs.readFileSync(DB_PATH, 'utf-8');
     const json = JSON.parse(data);
+    // 兼容历史数据：将未带 userId 的旧记录一次性归属到当前设备
+    let migrated = false;
+    if (Array.isArray(json.records)) {
+      for (const item of json.records) {
+        if (item && !item.userId) {
+          item.userId = userId;
+          migrated = true;
+        }
+      }
+      if (migrated) fs.writeFileSync(DB_PATH, JSON.stringify(json, null, 2));
+    }
     const records = (json.records || []).filter(r => r && r.userId === userId);
     res.json(records);
   } catch (err) {
@@ -841,6 +852,17 @@ app.get('/api/plans', (req, res) => {
   try {
     const data = fs.readFileSync(DB_PATH, 'utf-8');
     const json = JSON.parse(data);
+    // 兼容历史数据：将未带 userId 的旧计划一次性归属到当前设备
+    let migrated = false;
+    if (Array.isArray(json.plans)) {
+      for (const item of json.plans) {
+        if (item && !item.userId) {
+          item.userId = userId;
+          migrated = true;
+        }
+      }
+      if (migrated) fs.writeFileSync(DB_PATH, JSON.stringify(json, null, 2));
+    }
     const plans = (json.plans || []).filter(p => p && p.userId === userId);
     res.json(plans);
   } catch (err) {
