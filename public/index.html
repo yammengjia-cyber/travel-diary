@@ -1888,7 +1888,15 @@
                     const filename = src.split('/').pop();
                     img.src = `/api/heic-preview/${encodeURIComponent(filename)}`;
                     img.onerror = () => { img.style.background='linear-gradient(135deg,#ddd,#bbb)'; img.alt='HEIC 照片加载失败'; img.style.minHeight='120px'; };
-                } else { img.src = src; }
+                } else {
+                    img.src = src;
+                    img.onerror = () => {
+                        img.removeAttribute('src');
+                        img.style.background = 'linear-gradient(135deg,#ddd,#bbb)';
+                        img.alt = '照片加载失败';
+                        img.style.minHeight = '120px';
+                    };
+                }
                 div.appendChild(img);
                 const label = document.createElement('div');
                 label.className = 'polaroid-label';

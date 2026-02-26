@@ -21,6 +21,7 @@
 在 Render 的服务设置中添加：
 
 - `GEMINI_API_KEY` = 你的 Gemini API Key
+- `DEEPSEEK_API_KEY` = 你的 DeepSeek API Key（可选，配置后文本聊天优先走国内可达接口）
 
 不要把真实密钥写进仓库，也不要提交 `.env` 文件。
 

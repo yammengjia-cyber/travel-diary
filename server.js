@@ -11,7 +11,11 @@ const DB_PATH = path.join(__dirname, 'db.json');
 const UPLOADS_DIR = path.join(__dirname, 'public', 'uploads');
 
 // ========== Gemini AI 配置 ==========
-const genAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+const GEMINI_API_KEY = (process.env.GEMINI_API_KEY || '').trim();
+const DEEPSEEK_API_KEY = (process.env.DEEPSEEK_API_KEY || '').trim();
+const DEEPSEEK_MODEL = (process.env.DEEPSEEK_MODEL || 'deepseek-chat').trim();
+const DEEPSEEK_BASE_URL = (process.env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com').replace(/\/+$/, '');
+const genAI = GEMINI_API_KEY ? new GoogleGenAI({ apiKey: GEMINI_API_KEY }) : null;
 const chatSessions = new Map(); // 会话存储 sessionId -> { chat, history, keywords }
 const SESSION_TTL = 15 * 60 * 1000; // 15分钟过期
 // 主模型 → 轻量降级 → Gemma 兜底（Gemma 3 支持图片理解，且免费额度独立）
@@ -19,6 +23,7 @@ const MODELS = ['gemini-2.0-flash', 'gemini-2.0-flash-lite', 'gemma-3-27b-it', '
 
 // 带自动降级的 Gemini/Gemma 调用
 async function callGemini(contents) {
+  if (!genAI) throw new Error('Gemini API key missing');
   let lastErr = null;
   for (const model of MODELS) {
     for (let attempt = 0; attempt < 2; attempt++) {
@@ -43,6 +48,36 @@ async function callGemini(contents) {
     }
   }
   throw lastErr || new Error('所有模型均不可用，请稍后再试');
+}
+
+async function callDeepSeek(messages) {
+  if (!DEEPSEEK_API_KEY) throw new Error('DeepSeek API key missing');
+  const response = await fetch(`${DEEPSEEK_BASE_URL}/chat/completions`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${DEEPSEEK_API_KEY}`
+    },
+    body: JSON.stringify({
+      model: DEEPSEEK_MODEL,
+      messages,
+      temperature: 0.7
+    })
+  });
+  if (!response.ok) {
+    const errText = await response.text();
+    throw new Error(`DeepSeek API error ${response.status}: ${errText.substring(0, 200)}`);
+  }
+  const data = await response.json();
+  return data?.choices?.[0]?.message?.content || '';
+}
+
+async function callTextOnly(prompt) {
+  if (DEEPSEEK_API_KEY) {
+    return callDeepSeek([{ role: 'user', content: prompt }]);
+  }
+  const res = await callGemini([{ role: 'user', parts: [{ text: prompt }] }]);
+  return res.text || '';
 }
 
 // 根据文件扩展名获取正确的 MIME 类型（支持 HEIC 等特殊格式）
@@ -693,8 +728,7 @@ app.post('/api/records', async (req, res) => {
         try {
           const chatContent = pendingSession.chatLog.map(m => `${m.role === 'ai' ? 'AI' : '用户'}：${m.text}`).join('\n');
           const summaryPrompt = `根据以下旅行对话内容，写一段温暖、有画面感的旅行日记（80-150字），用第一人称"我"来写，像散文一样优美，不需要标题，不要使用**星号标记：\n\n${chatContent}`;
-          const summaryRes = await callGemini([{ role: 'user', parts: [{ text: summaryPrompt }] }]);
-          const summaryText = (summaryRes.text || '').replace(/```/g, '').replace(/\*\*/g, '').trim();
+          const summaryText = (await callTextOnly(summaryPrompt)).replace(/```/g, '').replace(/\*\*/g, '').trim();
           if (summaryText) {
             const curDb = JSON.parse(fs.readFileSync(DB_PATH, 'utf-8'));
             const rec = curDb.records.find(r => r.id === record.id);
@@ -784,8 +818,7 @@ app.patch('/api/records/:id/chat', async (req, res) => {
         try {
           const chatContent = session.chatLog.map(m => `${m.role === 'ai' ? 'AI' : '用户'}：${m.text}`).join('\n');
           const summaryPrompt = `根据以下旅行对话内容，写一段温暖、有画面感的旅行日记（80-150字），用第一人称"我"来写，不要使用**星号标记：\n\n${chatContent}`;
-          const summaryRes = await callGemini([{ role: 'user', parts: [{ text: summaryPrompt }] }]);
-          const summaryText = (summaryRes.text || '').replace(/```/g, '').replace(/\*\*/g, '').trim();
+          const summaryText = (await callTextOnly(summaryPrompt)).replace(/```/g, '').replace(/\*\*/g, '').trim();
           if (summaryText) rec.aiSummary = summaryText;
         } catch (e) { console.warn('AI总结更新失败:', e.message); }
         chatSessions.delete(chatSessionId);
@@ -814,8 +847,7 @@ app.patch('/api/plans/:id/chat', async (req, res) => {
         try {
           const chatContent = session.chatLog.map(m => `${m.role === 'ai' ? 'AI' : '用户'}：${m.text}`).join('\n');
           const summaryPrompt = `根据以下旅行规划对话，写一段简洁的旅行计划摘要（80-120字），不要使用**星号标记：\n\n${chatContent}`;
-          const summaryRes = await callGemini([{ role: 'user', parts: [{ text: summaryPrompt }] }]);
-          const summaryText = (summaryRes.text || '').replace(/```/g, '').replace(/\*\*/g, '').trim();
+          const summaryText = (await callTextOnly(summaryPrompt)).replace(/```/g, '').replace(/\*\*/g, '').trim();
           if (summaryText) plan.aiSummary = summaryText;
         } catch (e) { console.warn('计划AI总结更新失败:', e.message); }
         chatSessions.delete(chatSessionId);
@@ -913,8 +945,7 @@ app.post('/api/plans', async (req, res) => {
         try {
           const chatContent = pendingPlanSession.chatLog.map(m => `${m.role === 'ai' ? 'AI' : '用户'}：${m.text}`).join('\n');
           const summaryPrompt = `根据以下旅行规划对话，写一段简洁的旅行计划摘要（80-120字），包含目的地亮点、推荐时间、关键建议，像旅行手册一样实用：\n\n${chatContent}`;
-          const summaryRes = await callGemini([{ role: 'user', parts: [{ text: summaryPrompt }] }]);
-          const summaryText = (summaryRes.text || '').replace(/```/g, '').replace(/\*\*/g, '').trim();
+          const summaryText = (await callTextOnly(summaryPrompt)).replace(/```/g, '').replace(/\*\*/g, '').trim();
           if (summaryText) {
             const curDb = JSON.parse(fs.readFileSync(DB_PATH, 'utf-8'));
             const rec = (curDb.plans || []).find(p => p.id === plan.id);
@@ -993,18 +1024,36 @@ app.post('/api/chat/start', async (req, res) => {
       ? '这是我旅行时拍的照片，帮我回忆一下这段旅行吧！'
       : '我想记录一段旅行回忆，帮我聊聊吧！');
 
-    // 调用 Gemini
-    const contents = [
-      { role: 'user', parts: [{ text: systemPrompt + '\n\n' + userFirstMsg }, ...imageParts] }
-    ];
+    let rawText = '';
+    let provider = 'gemini';
+    let history = [];
+    let deepseekMessages = [];
 
-    // 调用 Gemini（含自动降级）
-    const response = await callGemini(contents);
+    // 无图场景优先使用 DeepSeek（国内可达性更好），有图时仍使用 Gemini
+    if (imageParts.length === 0 && DEEPSEEK_API_KEY) {
+      provider = 'deepseek';
+      deepseekMessages = [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userFirstMsg }
+      ];
+      rawText = await callDeepSeek(deepseekMessages);
+      deepseekMessages.push({ role: 'assistant', content: rawText });
+    } else {
+      const contents = [
+        { role: 'user', parts: [{ text: systemPrompt + '\n\n' + userFirstMsg }, ...imageParts] }
+      ];
+      const response = await callGemini(contents);
+      rawText = response.text || '';
+      history = [
+        { role: 'user', parts: [{ text: systemPrompt + '\n\n' + userFirstMsg }, ...imageParts] },
+        { role: 'model', parts: [{ text: rawText }] }
+      ];
+    }
 
     let reply = '', keywords = [];
     try {
       // 尝试解析 JSON 回复
-      const text = response.text || '';
+      const text = rawText || '';
       const jsonMatch = text.match(/\{[\s\S]*"reply"[\s\S]*\}/);
       if (jsonMatch) {
         const parsed = JSON.parse(jsonMatch[0]);
@@ -1014,21 +1063,17 @@ app.post('/api/chat/start', async (req, res) => {
         reply = text.replace(/```json\s*/g, '').replace(/```/g, '').trim();
       }
     } catch (e) {
-      reply = response.text || '你好！跟我聊聊这段旅行吧～';
+      reply = rawText || '你好！跟我聊聊这段旅行吧～';
     }
     reply = stripKeywordsLeak(reply);
-
-    // 保存会话
-    const history = [
-      { role: 'user', parts: [{ text: systemPrompt + '\n\n' + userFirstMsg }, ...imageParts] },
-      { role: 'model', parts: [{ text: response.text || reply }] }
-    ];
 
     // 标准化关键词格式
     const normalizedKw = (keywords || []).map(kw => typeof kw === 'string' ? { text: kw, type: 'other' } : kw);
 
     chatSessions.set(sessionId, {
+      provider,
       history,
+      deepseekMessages,
       keywords: normalizedKw,
       chatLog: [{ role: 'ai', text: reply }],
       lastActive: Date.now()
@@ -1075,16 +1120,34 @@ app.post('/api/chat/start-plan', async (req, res) => {
     const locationInfo = location ? `用户选择了目的地：${location}。` : '';
     const userFirstMsg = locationInfo + '我在考虑去这个地方旅行。';
 
-    const contents = [
-      { role: 'user', parts: [{ text: systemPrompt + '\n\n' + userFirstMsg }] }
-    ];
+    let rawText = '';
+    let provider = 'gemini';
+    let history = [];
+    let deepseekMessages = [];
 
-    // 调用 Gemini（含自动降级）
-    const response = await callGemini(contents);
+    if (DEEPSEEK_API_KEY) {
+      provider = 'deepseek';
+      deepseekMessages = [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userFirstMsg }
+      ];
+      rawText = await callDeepSeek(deepseekMessages);
+      deepseekMessages.push({ role: 'assistant', content: rawText });
+    } else {
+      const contents = [
+        { role: 'user', parts: [{ text: systemPrompt + '\n\n' + userFirstMsg }] }
+      ];
+      const response = await callGemini(contents);
+      rawText = response.text || '';
+      history = [
+        { role: 'user', parts: [{ text: systemPrompt + '\n\n' + userFirstMsg }] },
+        { role: 'model', parts: [{ text: rawText }] }
+      ];
+    }
 
     let reply = '', keywords = [];
     try {
-      const text = response.text || '';
+      const text = rawText || '';
       const jsonMatch = text.match(/\{[\s\S]*"reply"[\s\S]*\}/);
       if (jsonMatch) {
         const parsed = JSON.parse(jsonMatch[0]);
@@ -1094,19 +1157,16 @@ app.post('/api/chat/start-plan', async (req, res) => {
         reply = text.replace(/```json\s*/g, '').replace(/```/g, '').trim();
       }
     } catch (e) {
-      reply = response.text || '让我来帮你规划旅行吧～';
+      reply = rawText || '让我来帮你规划旅行吧～';
     }
     reply = stripKeywordsLeak(reply);
-
-    const history = [
-      { role: 'user', parts: [{ text: systemPrompt + '\n\n' + userFirstMsg }] },
-      { role: 'model', parts: [{ text: response.text || reply }] }
-    ];
 
     const normalizedKw = (keywords || []).map(kw => typeof kw === 'string' ? { text: kw, type: 'other' } : kw);
 
     chatSessions.set(sessionId, {
+      provider,
       history,
+      deepseekMessages,
       keywords: normalizedKw,
       chatLog: [{ role: 'ai', text: reply }],
       lastActive: Date.now()
@@ -1130,16 +1190,24 @@ app.post('/api/chat/message', async (req, res) => {
   try {
     session.lastActive = Date.now();
     session.chatLog.push({ role: 'user', text: message });
+    let rawText = '';
 
-    // 追加用户消息到历史
-    session.history.push({ role: 'user', parts: [{ text: message }] });
-
-    // 调用 Gemini 继续对话（含自动降级）
-    const response = await callGemini(session.history);
+    if (session.provider === 'deepseek' && DEEPSEEK_API_KEY) {
+      if (!Array.isArray(session.deepseekMessages)) session.deepseekMessages = [];
+      session.deepseekMessages.push({ role: 'user', content: message });
+      rawText = await callDeepSeek(session.deepseekMessages);
+      session.deepseekMessages.push({ role: 'assistant', content: rawText });
+    } else {
+      // 默认 Gemini 多轮
+      session.history.push({ role: 'user', parts: [{ text: message }] });
+      const response = await callGemini(session.history);
+      rawText = response.text || '';
+      session.history.push({ role: 'model', parts: [{ text: rawText }] });
+    }
 
     let reply = '', newKeywords = [];
     try {
-      const text = response.text || '';
+      const text = rawText || '';
       const jsonMatch = text.match(/\{[\s\S]*"reply"[\s\S]*\}/);
       if (jsonMatch) {
         const parsed = JSON.parse(jsonMatch[0]);
@@ -1149,12 +1217,9 @@ app.post('/api/chat/message', async (req, res) => {
         reply = text.replace(/```json\s*/g, '').replace(/```/g, '').trim();
       }
     } catch (e) {
-      reply = response.text || '嗯嗯，继续跟我说说～';
+      reply = rawText || '嗯嗯，继续跟我说说～';
     }
     reply = stripKeywordsLeak(reply);
-
-    // 追加 AI 回复到历史
-    session.history.push({ role: 'model', parts: [{ text: response.text || reply }] });
     session.chatLog.push({ role: 'ai', text: reply });
 
     // 合并关键词（按 text 去重，支持新格式 {text,type} 和旧格式 string）
@@ -1187,16 +1252,22 @@ app.post('/api/chat/resume', (req, res) => {
     : '你是「拾光鹿」，一位温暖的旅行回忆助手。请继续之前的对话，帮用户补充更多旅行回忆。回复格式：{"reply":"回复","keywords":[{"text":"关键词","type":"类型"}]}，不要使用**星号，用\\n分段。';
 
   // 重建 Gemini 对话历史
+  const summaryHistoryText = '（以下是之前的对话记录，请基于这些内容继续）\n' + chatLog.map(m => `${m.role === 'ai' ? 'AI' : '用户'}：${m.text}`).join('\n');
   const history = [];
-  // 首条包含系统提示
-  const firstUserMsg = chatLog.find(m => m.role === 'user');
-  history.push({ role: 'user', parts: [{ text: systemPrompt + '\n\n（以下是之前的对话记录，请基于这些内容继续）\n' + chatLog.map(m => `${m.role === 'ai' ? 'AI' : '用户'}：${m.text}`).join('\n') }] });
+  history.push({ role: 'user', parts: [{ text: systemPrompt + '\n\n' + summaryHistoryText }] });
   history.push({ role: 'model', parts: [{ text: '好的，我已经了解了之前的对话内容，请继续吧！' }] });
+  const deepseekMessages = [
+    { role: 'system', content: systemPrompt },
+    { role: 'user', content: summaryHistoryText },
+    { role: 'assistant', content: '好的，我已经了解了之前的对话内容，请继续吧！' }
+  ];
 
   const normalizedKw = (keywords || []).map(kw => typeof kw === 'string' ? { text: kw, type: 'other' } : kw);
 
   chatSessions.set(sessionId, {
+    provider: DEEPSEEK_API_KEY ? 'deepseek' : 'gemini',
     history,
+    deepseekMessages,
     keywords: normalizedKw,
     chatLog: [...chatLog], // 复制历史记录
     lastActive: Date.now()
